@@ -181,13 +181,61 @@ def generate_with_fallback(
 
 
 # --------------------------------------------------------------------------- #
-# Page Configuration                                                          #
+# Page Configuration & Modern Styling                                          #
 # --------------------------------------------------------------------------- #
 
 st.set_page_config(
     page_title="STEM Formula Extractor & Flashcards",
     page_icon="⚛️",
     layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    /* Bigger, rounded tabs with smooth hover animations */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+        padding-top: 8px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        padding: 12px 26px !important;
+        border-radius: 12px 12px 0 0 !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-bottom: none !important;
+        color: #e2e8f0 !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: #38bdf8 !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+        border-color: rgba(56, 189, 248, 0.5) !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(180deg, rgba(56, 189, 248, 0.2) 0%, rgba(56, 189, 248, 0.04) 100%) !important;
+        border-color: #38bdf8 !important;
+        color: #38bdf8 !important;
+        border-bottom: 2px solid #38bdf8 !important;
+        box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25) !important;
+    }
+    /* Compact document preview image */
+    .stImage img {
+        border-radius: 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+        max-height: 480px !important;
+        object-fit: contain !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # --------------------------------------------------------------------------- #
@@ -299,18 +347,22 @@ with input_tab_upload:
                     st.stop()
             preview_bytes = st.session_state[pdf_cache_key]
             img = Image.open(io.BytesIO(preview_bytes))
-            st.image(
-                img,
-                caption=f"{uploaded.name} (Page {selected_page} of {total_pages})",
-                use_container_width=True,
-            )
+            
+            # Display image in a clean, constrained column so it doesn't span full-screen
+            col_preview, _ = st.columns([1, 1])
+            with col_preview:
+                st.image(
+                    img,
+                    caption=f"{uploaded.name} (Page {selected_page} of {total_pages})",
+                    width=440,
+                )
             active_image_bytes = preview_bytes
         else:
             if "img_rotation" not in st.session_state:
                 st.session_state["img_rotation"] = 0
 
-            col_img_h, col_img_r = st.columns([3, 1])
-            with col_img_r:
+            col_rot_btn, _ = st.columns([1, 3])
+            with col_rot_btn:
                 if st.button("🔄 Rotate 90°", help="Rotate image clockwise if notes appear sideways"):
                     st.session_state["img_rotation"] = (st.session_state["img_rotation"] + 90) % 360
                     st.rerun()
@@ -325,11 +377,14 @@ with input_tab_upload:
             else:
                 active_image_bytes = raw_bytes
 
-            st.image(
-                img,
-                caption=uploaded.name + (f" (Rotated {rot_deg}°)" if rot_deg else ""),
-                use_container_width=True,
-            )
+            # Display image in a clean, constrained column so it doesn't span full-screen
+            col_preview, _ = st.columns([1, 1])
+            with col_preview:
+                st.image(
+                    img,
+                    caption=uploaded.name + (f" (Rotated {rot_deg}°)" if rot_deg else ""),
+                    width=440,
+                )
 
 # Tab 2: Paste Raw Text Notes
 with input_tab_text:
@@ -410,29 +465,20 @@ if st.button(btn_title, type="primary", use_container_width=True):
             st.stop()
 
 # --------------------------------------------------------------------------- #
-# Output Tabs                                                                  #
+# Output Tabs: Dynamic based on Active Mode                                    #
 # --------------------------------------------------------------------------- #
 
+is_formula_mode = "Formula Extractor" in active_mode
 has_formulas = "formulas" in st.session_state and st.session_state["formulas"]
 has_cards = "cards" in st.session_state and st.session_state["cards"]
 
-if has_formulas or has_cards:
-    st.divider()
+# When in Formula Extractor mode, only show Formula Extractor & Counter-Question
+if is_formula_mode:
+    if has_formulas:
+        st.divider()
+        tab_formulas, tab_counter = st.tabs(["📐 Formula Extractor", "💬 Counter Question"])
 
-    tab_formulas, tab_cards, tab_quiz, tab_counter = st.tabs(
-        [
-            "📐 Formula Extractor",
-            "📖 Browse Flashcards",
-            "🎯 Quiz Mode",
-            "💬 Counter Question",
-        ]
-    )
-
-    # ----------------------------------------------------------------------- #
-    # 1. Formula Extractor Tab                                                #
-    # ----------------------------------------------------------------------- #
-    with tab_formulas:
-        if has_formulas:
+        with tab_formulas:
             formulas = st.session_state["formulas"]
             st.markdown(f"### 📐 Extracted Formulas ({len(formulas)})")
             st.caption("Governing equations, variable definitions with SI units, and validity conditions.")
@@ -445,7 +491,6 @@ if has_formulas or has_cards:
                     with col_idx:
                         st.caption(f"`Formula #{i}`")
 
-                    # LaTeX equation
                     raw_eq = f.get("latex_equation", "").strip()
                     if raw_eq:
                         try:
@@ -456,7 +501,6 @@ if has_formulas or has_cards:
                     if f.get("description"):
                         st.markdown(f"**Description:** {f['description']}")
 
-                    # Variables Table
                     vars_list = f.get("variables", [])
                     if vars_list:
                         st.markdown("**Variables & SI Units:**")
@@ -468,18 +512,106 @@ if has_formulas or has_cards:
                             table_rows.append(f"| `${sym}$` | {defn} | `{unit}` |")
                         st.markdown("\n".join(table_rows))
 
-                    # Assumptions
                     assumptions = f.get("assumptions")
                     if assumptions:
                         st.info(f"**⚠️ Validity Limits & Conditions:** {assumptions}")
-        else:
-            st.info("ℹ️ Select **📐 Formula Extractor** in the sidebar and click Run to extract formulas.")
 
-    # ----------------------------------------------------------------------- #
-    # 2. Browse Flashcards Tab                                                #
-    # ----------------------------------------------------------------------- #
-    with tab_cards:
-        if has_cards:
+        with tab_counter:
+            st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
+            st.caption(
+                "Challenge or probe any extracted formula. Gemma 4 provides rigorous STEM explanations."
+            )
+
+            q_options = [
+                f"Formula #{i}: {f['name']} ({f.get('latex_equation', '')})"
+                for i, f in enumerate(formulas, start=1)
+            ]
+            q_lookup = {
+                f"Formula #{i}: {f['name']} ({f.get('latex_equation', '')})": {
+                    "front": f"{f['name']}: {f.get('latex_equation', '')}",
+                    "back": f"{f.get('description', '')}. Validity: {f.get('assumptions', '')}",
+                }
+                for i, f in enumerate(formulas, start=1)
+            }
+
+            selected_item = st.selectbox(
+                "Select Formula to Probe",
+                options=q_options,
+                index=0,
+            )
+            context = q_lookup[selected_item]
+
+            with st.container(border=True):
+                st.markdown(f"**Formula:** {context['front']}")
+                st.markdown(f"**Details:** {context['back']}")
+
+            if "counter_history" not in st.session_state:
+                st.session_state["counter_history"] = {}
+
+            history_key = f"q_{abs(hash(selected_item)) % 100000}"
+            current_history = st.session_state["counter_history"].get(history_key, [])
+
+            if current_history:
+                st.markdown("#### Discussion History")
+                for item in current_history:
+                    with st.chat_message("user"):
+                        st.write(item["query"])
+                    with st.chat_message("assistant"):
+                        st.markdown(item["response"])
+                        st.caption(
+                            f"<small>Answered by <b>{item.get('model', 'Gemma 4')}</b></small>",
+                            unsafe_allow_html=True,
+                        )
+
+            user_query = st.text_area(
+                "Your Counter-Question or Query",
+                placeholder="e.g., Why does this formula assume an ideal gas? What breaks down at relativistic speeds?",
+                key=f"query_input_{history_key}",
+                height=100,
+            )
+
+            if st.button("🚀 Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
+                if not user_query.strip():
+                    st.warning("Please type a question before asking.")
+                else:
+                    with st.spinner(f"Asking {preferred_model} to analyze your question…"):
+                        try:
+                            counter_prompt = build_counter_question_prompt(
+                                context["front"],
+                                context["back"],
+                                user_query.strip(),
+                                language,
+                            )
+                            contents = [types.Content(parts=[types.Part.from_text(text=counter_prompt)])]
+                            answer, ans_model = generate_with_fallback(
+                                contents, preferred_model=preferred_model
+                            )
+
+                            if history_key not in st.session_state["counter_history"]:
+                                st.session_state["counter_history"][history_key] = []
+
+                            st.session_state["counter_history"][history_key].append({
+                                "query": user_query.strip(),
+                                "response": answer,
+                                "model": ans_model,
+                            })
+                            st.rerun()
+                        except RuntimeError as err:
+                            st.error(f"❌ Error getting response from Gemma 4: {err}")
+
+# When in Flashcards mode, only show Browse Flashcards, Quiz Mode & Counter-Question
+else:
+    if has_cards:
+        st.divider()
+        tab_cards, tab_quiz, tab_counter = st.tabs(
+            [
+                "📖 Browse Flashcards",
+                "🎯 Quiz Mode",
+                "💬 Counter Question",
+            ]
+        )
+
+        with tab_cards:
             cards = st.session_state["cards"]
             st.markdown(f"### 🃏 Study Flashcards ({len(cards)})")
             st.caption("Review flashcards with LaTeX equations or export to Anki.")
@@ -518,14 +650,8 @@ if has_formulas or has_cards:
                 mime="text/csv",
                 use_container_width=True,
             )
-        else:
-            st.info("ℹ️ Select **🃏 Flashcards** in the sidebar and click Run to generate flashcards.")
 
-    # ----------------------------------------------------------------------- #
-    # 3. Interactive Quiz Mode Tab                                            #
-    # ----------------------------------------------------------------------- #
-    with tab_quiz:
-        if has_cards:
+        with tab_quiz:
             cards = st.session_state["cards"]
             idx: int = st.session_state.get("quiz_index", 0)
             score: int = st.session_state.get("quiz_score", 0)
@@ -601,46 +727,29 @@ if has_formulas or has_cards:
                             st.session_state["quiz_index"] += 1
                             st.session_state["revealed"] = False
                             st.rerun()
-        else:
-            st.info("ℹ️ Quiz mode requires generated flashcards. Run synthesis in Flashcard mode first.")
 
-    # ----------------------------------------------------------------------- #
-    # 4. Counter-Question & Q&A Tab                                           #
-    # ----------------------------------------------------------------------- #
-    with tab_counter:
-        st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
-        st.caption(
-            "Challenge or probe any synthesized concept or formula. Gemma 4 provides rigorous STEM explanations."
-        )
+        with tab_counter:
+            st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
+            st.caption(
+                "Challenge or probe any flashcard concept. Gemma 4 provides rigorous STEM explanations."
+            )
 
-        # Build options from flashcards or formulas
-        q_options = []
-        q_lookup = {}
-        if has_cards:
-            for i, c in enumerate(st.session_state["cards"], start=1):
-                label = f"Flashcard #{i}: {c['front']}"
-                q_options.append(label)
-                q_lookup[label] = {"front": c["front"], "back": c["back"]}
-        if has_formulas:
-            for i, f in enumerate(st.session_state["formulas"], start=1):
-                label = f"Formula #{i}: {f['name']} ({f.get('latex_equation', '')})"
-                q_options.append(label)
-                q_lookup[label] = {
-                    "front": f"{f['name']}: {f.get('latex_equation', '')}",
-                    "back": f"{f.get('description', '')}. Validity: {f.get('assumptions', '')}",
-                }
+            q_options = [f"Flashcard #{i}: {c['front']}" for i, c in enumerate(cards, start=1)]
+            q_lookup = {
+                f"Flashcard #{i}: {c['front']}": {"front": c["front"], "back": c["back"]}
+                for i, c in enumerate(cards, start=1)
+            }
 
-        if q_options:
             selected_item = st.selectbox(
-                "Select Concept or Formula to Probe",
+                "Select Flashcard to Probe",
                 options=q_options,
                 index=0,
             )
             context = q_lookup[selected_item]
 
             with st.container(border=True):
-                st.markdown(f"**Concept:** {context['front']}")
-                st.markdown(f"**Answer / Law:** {context['back']}")
+                st.markdown(f"**Question:** {context['front']}")
+                st.markdown(f"**Answer:** {context['back']}")
 
             if "counter_history" not in st.session_state:
                 st.session_state["counter_history"] = {}
@@ -662,7 +771,7 @@ if has_formulas or has_cards:
 
             user_query = st.text_area(
                 "Your Counter-Question or Query",
-                placeholder="e.g., Why does this formula assume an ideal gas? What breaks down at relativistic speeds? What is the physical meaning of this constant?",
+                placeholder="e.g., Why does this principle apply? What are the limitations?",
                 key=f"query_input_{history_key}",
                 height=100,
             )
@@ -695,8 +804,6 @@ if has_formulas or has_cards:
                             st.rerun()
                         except RuntimeError as err:
                             st.error(f"❌ Error getting response from Gemma 4: {err}")
-        else:
-            st.info("ℹ️ Run generation first to populate concepts and formulas for Q&A.")
 
 # --------------------------------------------------------------------------- #
 # Footer                                                                       #
