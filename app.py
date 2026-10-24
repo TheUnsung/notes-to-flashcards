@@ -68,6 +68,17 @@ def _classify(exc: Exception) -> str:
     return "unknown"
 
 
+def _get_api_key() -> str:
+    """Read API key from environment variable or Streamlit secrets."""
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        try:
+            key = st.secrets.get("GEMINI_API_KEY", "")
+        except Exception:
+            key = ""
+    return str(key).strip()
+
+
 # --------------------------------------------------------------------------- #
 # Core API function                                                            #
 # --------------------------------------------------------------------------- #
@@ -88,7 +99,7 @@ def generate_with_fallback(
 
     Raises RuntimeError if all models fail.
     """
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = _get_api_key()
     if not api_key:
         raise RuntimeError(
             "GEMINI_API_KEY is not set. "
@@ -173,7 +184,7 @@ st.set_page_config(
 # --------------------------------------------------------------------------- #
 # API key guard                                                                #
 # --------------------------------------------------------------------------- #
-if not os.environ.get("GEMINI_API_KEY"):
+if not _get_api_key():
     st.error(
         "⚠️ **GEMINI_API_KEY is not set.**\n\n"
         "Please export your Gemini API key before running the app:\n\n"
