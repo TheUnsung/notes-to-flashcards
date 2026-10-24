@@ -1,7 +1,7 @@
 """
 app.py – Streamlit UI for STEM Formula Extractor & Flashcards.
 
-Strictly configured to run on localhost (streamlit run app.py).
+Supports both local execution (via .env) and Streamlit Cloud (via st.secrets).
 Powered by Gemma 4 models via Google GenAI SDK.
 """
 
@@ -15,7 +15,7 @@ from google import genai
 from google.genai import types
 from PIL import Image
 
-# Load local environment variables from .env file
+# Load local environment variables from .env file if present
 load_dotenv()
 
 # --------------------------------------------------------------------------- #
@@ -70,8 +70,14 @@ def _classify(exc: Exception) -> str:
 
 
 def _get_api_key() -> str:
-    """Read API key from local environment variable."""
-    return str(os.environ.get("GEMINI_API_KEY", "")).strip()
+    """Read API key from local environment variable (.env) or Streamlit Cloud secrets."""
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        try:
+            key = st.secrets.get("GEMINI_API_KEY", "")
+        except Exception:
+            key = ""
+    return str(key).strip()
 
 
 # --------------------------------------------------------------------------- #
@@ -96,7 +102,7 @@ def generate_with_fallback(
     api_key = _get_api_key()
     if not api_key:
         raise RuntimeError(
-            "GEMINI_API_KEY is not set. Please configure it in your local .env file."
+            "GEMINI_API_KEY is not configured. Set it in your local .env or Streamlit Cloud secrets."
         )
 
     client = genai.Client(api_key=api_key)
@@ -221,8 +227,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown(
-        "<small>Runs 100% locally on localhost.<br>"
-        "Powered by <b>Gemma 4</b> via Google GenAI SDK</small>",
+        "<small>Powered by <b>Gemma 4</b> via Google GenAI SDK</small>",
         unsafe_allow_html=True,
     )
 
@@ -352,7 +357,11 @@ st.divider()
 btn_title = f"✨ Run {active_mode}"
 if st.button(btn_title, type="primary", use_container_width=True):
     if not _get_api_key():
-        st.error("❌ GEMINI_API_KEY is not configured in your local .env file.")
+        st.error(
+            "❌ **GEMINI_API_KEY is not configured.**\n\n"
+            "- If running locally: create a `.env` file with `GEMINI_API_KEY=your_key`.\n"
+            "- If running on Streamlit Cloud: set `GEMINI_API_KEY` in **App Settings → Secrets**."
+        )
         st.stop()
 
     contents_list = []
@@ -481,4 +490,4 @@ if has_formulas or has_cards:
 
 st.divider()
 used_model_display = st.session_state.get("used_model", "Gemma 4")
-st.caption(f"Powered by {used_model_display} via Google GenAI SDK · Localhost Edition")
+st.caption(f"Powered by {used_model_display} via Google GenAI SDK")

@@ -11,7 +11,7 @@ A streamlined educational tool built exclusively with **Gemma 4** open-weight mo
 1. **📐 Formula Extractor**: Extracts all governing mathematical and physical equations, variable definitions with standard SI units, and core validity conditions/assumptions.
 2. **🃏 Flashcards**: Generates concise study flashcards formatted with LaTeX mathematical equations, complete with one-click Anki CSV export.
 
-CRITICAL LOCALHOST DESIGN: Strictly configured to run **100% locally on `localhost`**. Your API key is loaded securely in the background from your local `.env` file and never exposed in the UI.
+Supports both **local execution** (via `.env`) and **Streamlit Community Cloud** (via `st.secrets`).
 
 ---
 
@@ -50,32 +50,43 @@ CRITICAL LOCALHOST DESIGN: Strictly configured to run **100% locally on `localho
 
 ---
 
-## 💻 Localhost Quickstart
+## 💻 Quickstart
 
-### 1. Setup Virtual Environment & Dependencies
-```bash
-python -m venv .venv
+### Running Locally
 
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
+1. **Setup Virtual Environment & Dependencies**:
+   ```bash
+   python -m venv .venv
 
-# macOS / Linux:
-source .venv/bin/activate
+   # Windows (PowerShell):
+   .venv\Scripts\Activate.ps1
 
-pip install -r requirements.txt
-```
+   # macOS / Linux:
+   source .venv/bin/activate
 
-### 2. Configure API Key
-Create a `.env` file in the project root:
-```env
-GEMINI_API_KEY=your_gemini_api_key
-```
+   pip install -r requirements.txt
+   ```
 
-### 3. Run on Localhost
-```bash
-streamlit run app.py
-```
-Open **[http://localhost:8501](http://localhost:8501)** (or your active local port) in your browser.
+2. **Configure API Key**:
+   Create a `.env` file in the project root:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+
+3. **Start the App**:
+   ```bash
+   streamlit run app.py
+   ```
+   Open **[http://localhost:8501](http://localhost:8501)** in your browser.
+
+### Deploying to Streamlit Community Cloud
+
+1. Fork or push this repository to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io/) and deploy your repo (`app.py`).
+3. In your Streamlit app dashboard, open **Settings → Secrets** and add:
+   ```toml
+   GEMINI_API_KEY = "your_actual_api_key_here"
+   ```
 
 ---
 
