@@ -29,10 +29,12 @@ from cards import (
 
 # --------------------------------------------------------------------------- #
 # Model list – Gemma 4 only.  First entry is the default preferred model.     #
+# gemma-4-26b-a4b-it is a Mixture-of-Experts model with only 4B active       #
+# parameters per token, making it significantly faster with lower latency.   #
 # --------------------------------------------------------------------------- #
 MODELS = [
-    "gemma-4-31b-it",
-    "gemma-4-26b-a4b-it",
+    "gemma-4-26b-a4b-it",  # Faster default: 4B active parameters (MoE)
+    "gemma-4-31b-it",      # High-capacity fallback: 31B dense parameters
 ]
 
 # --------------------------------------------------------------------------- #
@@ -124,7 +126,10 @@ def generate_with_fallback(
                 response = client.models.generate_content(
                     model=model,
                     contents=contents,
-                    # No response_mime_type – Gemma may reject JSON mode
+                    config=types.GenerateContentConfig(
+                        temperature=0.2,
+                        max_output_tokens=2048,
+                    ),
                 )
                 return response.text or "", model
 
@@ -276,11 +281,16 @@ if uploaded:
         else:
             selected_page = 1
 
-        try:
-            preview_bytes = pdf_page_to_image(raw_bytes, page_number=selected_page - 1)
-        except ValueError as err:
-            st.error(f"❌ **Could not render PDF page:** {err}")
-            st.stop()
+        pdf_cache_key = f"pdf_preview_{uploaded.name}_{selected_page}"
+        if pdf_cache_key not in st.session_state:
+            try:
+                st.session_state[pdf_cache_key] = pdf_page_to_image(
+                    raw_bytes, page_number=selected_page - 1, dpi_scale=1.5
+                )
+            except ValueError as err:
+                st.error(f"❌ **Could not render PDF page:** {err}")
+                st.stop()
+        preview_bytes = st.session_state[pdf_cache_key]
 
         img = Image.open(io.BytesIO(preview_bytes))
         st.image(img, caption=f"{uploaded.name} (Page {selected_page} of {total_pages})", use_container_width=True)
@@ -297,8 +307,8 @@ if uploaded:
     # ----------------------------------------------------------------------- #
 
     if st.button("✨ Make flashcards", type="primary", use_container_width=True):
-        # Shrink before sending
-        image_bytes, mime_type = shrink_image(active_image_bytes)
+        # Fast shrink: max 1200px and quality 80 for rapid vision encoding and low latency
+        image_bytes, mime_type = shrink_image(active_image_bytes, max_side=1200, quality=80)
 
         prompt = build_prompt(num_cards, language)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)

@@ -39,8 +39,8 @@ used anywhere in the codebase. Using open-weight models means:
 
 | Priority | Model ID | Notes |
 |:-:|---|---|
-| 1 (default) | `gemma-4-31b-it` | Preferred – larger, higher quality |
-| 2 (fallback) | `gemma-4-26b-a4b-it` | Mixture-of-experts variant |
+| 1 (default) | `gemma-4-26b-a4b-it` | Faster default – MoE architecture with 4B active parameters for rapid token generation |
+| 2 (fallback) | `gemma-4-31b-it` | High-capacity fallback – dense 31B parameter model |
 
 The app tries the **preferred model** (user-selectable in the sidebar) first.
 If it is busy or unavailable, it automatically falls back to the other model.
