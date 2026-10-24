@@ -1,15 +1,17 @@
 # ⚛️ STEM Formula Extractor & Flashcards
 
 > **Hacktoberfest Hack Day · OpenSTEM Track**  
-> _Extract governing formulas, SI units, and validity assumptions, or generate study flashcards from your STEM notes._
+> _Extract governing formulas, SI units, and validity assumptions, or generate study flashcards with interactive quizzes and conceptual Q&A from your STEM notes._
 
 ---
 
 ## 🌟 Overview
 
-A streamlined educational tool built exclusively with **Gemma 4** open-weight models. It focuses on two core tasks:
-1. **📐 Formula Extractor**: Extracts all governing mathematical and physical equations, variable definitions with standard SI units, and core validity conditions/assumptions.
-2. **🃏 Flashcards**: Generates concise study flashcards formatted with LaTeX mathematical equations, complete with one-click Anki CSV export.
+An educational workstation built exclusively with **Gemma 4** open-weight models. It combines rigorous formula extraction with spaced-repetition flashcards:
+1. **📐 Formula Extractor**: Extracts governing mathematical equations, variable definitions with standard SI units, and core validity conditions/assumptions.
+2. **📖 Browse Flashcards**: Structured flashcards formatted with LaTeX mathematical equations, with one-click Anki CSV export and on-demand deep dives.
+3. **🎯 Quiz Mode**: Interactive flashcard testing with answer reveal, score tracking, and retention reviews.
+4. **💬 Counter-Question & Q&A**: Socratic conceptual dialogue allowing users to challenge or query any extracted formula or flashcard.
 
 Supports both **local execution** (via `.env`) and **Streamlit Community Cloud** (via `st.secrets`).
 
@@ -33,11 +35,19 @@ Supports both **local execution** (via `.env`) and **Streamlit Community Cloud**
 - Generates a structured table of variable symbols, definitions, and SI units.
 - Explicitly lists critical validity limits and assumptions (e.g., ideal gases, non-relativistic speeds, constant acceleration).
 
-### 2. 🃏 Flashcards & Anki Export
+### 2. 📖 Flashcards & Anki Export
 - Generates study flashcards from your notes with inline and block LaTeX equations.
+- On-demand "💡 Elaborate explanation" for any card.
 - Export directly to Anki-compatible `.csv` format for spaced-repetition study.
 
-### 3. 📥 Clean Multi-Format Input
+### 3. 🎯 Interactive Quiz Mode
+- Card-by-card quizzing with progress bar and score percentage.
+- Reveal answers, self-grade with "✅ I knew it" or "🔁 Review again", and get feedback.
+
+### 4. 💬 Conceptual Counter-Question & Socratic Q&A
+- Select any synthesized flashcard or extracted formula to challenge assumptions, explore edge cases, or ask for derivations from Gemma 4.
+
+### 5. 📥 Clean Multi-Format Input
 - **Image & PDF Upload**: Upload photos of handwritten notes or textbook pages (with 90° clockwise rotation and multi-page PDF page selection).
 - **Text Area**: Paste raw equations, derivations, or lecture notes directly.
 

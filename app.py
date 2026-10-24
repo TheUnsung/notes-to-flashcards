@@ -27,6 +27,8 @@ MODELS = [
 ]
 
 from cards import (
+    build_counter_question_prompt,
+    build_elaboration_prompt,
     build_formula_synthesizer_prompt,
     build_prompt,
     cards_to_csv,
@@ -238,7 +240,7 @@ with st.sidebar:
 st.title("⚛️ STEM Formula Extractor & Flashcards")
 st.caption(
     "Extract mathematical laws, SI variable units, and validity assumptions, "
-    "or generate study flashcards directly from your handwritten notes, PDFs, or text."
+    "or generate study flashcards with interactive quizzing and conceptual Q&A."
 )
 st.divider()
 
@@ -399,13 +401,16 @@ if st.button(btn_title, type="primary", use_container_width=True):
                 )
                 st.session_state["cards"] = parse_cards(raw_resp)
                 st.session_state["used_model"] = used_m
+                st.session_state["quiz_index"] = 0
+                st.session_state["quiz_score"] = 0
+                st.session_state["revealed"] = False
             st.success("✅ Generation complete!")
         except Exception as exc:
             st.error(f"❌ Generation failed: {exc}")
             st.stop()
 
 # --------------------------------------------------------------------------- #
-# Output Tabs: Only Formula Extractor & Flashcards                             #
+# Output Tabs                                                                  #
 # --------------------------------------------------------------------------- #
 
 has_formulas = "formulas" in st.session_state and st.session_state["formulas"]
@@ -414,9 +419,18 @@ has_cards = "cards" in st.session_state and st.session_state["cards"]
 if has_formulas or has_cards:
     st.divider()
 
-    tab_formulas, tab_cards = st.tabs(["📐 Formula Extractor", "🃏 Flashcards"])
+    tab_formulas, tab_cards, tab_quiz, tab_counter = st.tabs(
+        [
+            "📐 Formula Extractor",
+            "📖 Browse Flashcards",
+            "🎯 Quiz Mode",
+            "💬 Counter Question",
+        ]
+    )
 
-    # 1. Formula Extractor Tab
+    # ----------------------------------------------------------------------- #
+    # 1. Formula Extractor Tab                                                #
+    # ----------------------------------------------------------------------- #
     with tab_formulas:
         if has_formulas:
             formulas = st.session_state["formulas"]
@@ -461,7 +475,9 @@ if has_formulas or has_cards:
         else:
             st.info("ℹ️ Select **📐 Formula Extractor** in the sidebar and click Run to extract formulas.")
 
-    # 2. Flashcards Tab
+    # ----------------------------------------------------------------------- #
+    # 2. Browse Flashcards Tab                                                #
+    # ----------------------------------------------------------------------- #
     with tab_cards:
         if has_cards:
             cards = st.session_state["cards"]
@@ -471,6 +487,27 @@ if has_formulas or has_cards:
             for i, card in enumerate(cards, start=1):
                 with st.expander(f"Card {i}: {card['front']}"):
                     st.markdown(card["back"])
+
+                    elab_key = f"elab_browse_{i}_{hash(card['front']) % 10000}"
+                    if elab_key in st.session_state:
+                        st.info(st.session_state[elab_key])
+                    else:
+                        if st.button("💡 Elaborate explanation", key=f"btn_elab_{i}"):
+                            with st.spinner("Asking Gemma 4 to elaborate…"):
+                                try:
+                                    elab_prompt = build_elaboration_prompt(
+                                        card["front"], card["back"], language
+                                    )
+                                    elab_contents = [
+                                        types.Content(parts=[types.Part.from_text(text=elab_prompt)])
+                                    ]
+                                    elab_text, _ = generate_with_fallback(
+                                        elab_contents, preferred_model=preferred_model
+                                    )
+                                    st.session_state[elab_key] = elab_text
+                                    st.rerun()
+                                except Exception as err:
+                                    st.error(f"Could not elaborate: {err}")
 
             st.divider()
             csv_text = cards_to_csv(cards)
@@ -483,6 +520,183 @@ if has_formulas or has_cards:
             )
         else:
             st.info("ℹ️ Select **🃏 Flashcards** in the sidebar and click Run to generate flashcards.")
+
+    # ----------------------------------------------------------------------- #
+    # 3. Interactive Quiz Mode Tab                                            #
+    # ----------------------------------------------------------------------- #
+    with tab_quiz:
+        if has_cards:
+            cards = st.session_state["cards"]
+            idx: int = st.session_state.get("quiz_index", 0)
+            score: int = st.session_state.get("quiz_score", 0)
+            revealed: bool = st.session_state.get("revealed", False)
+
+            if idx >= len(cards):
+                st.balloons()
+                st.subheader("🎉 Quiz Complete!")
+                st.metric("Score", f"{score} / {len(cards)}")
+                pct = int(score / len(cards) * 100)
+                st.progress(pct / 100)
+                if pct == 100:
+                    st.success("Perfect mastery! Outstanding! 🏆")
+                elif pct >= 70:
+                    st.info("Solid understanding! Review missed cards to master the topic.")
+                else:
+                    st.warning("Keep practicing – reinforcement builds intuition! 💪")
+
+                if st.button("🔄 Restart Quiz", use_container_width=True):
+                    st.session_state["quiz_index"] = 0
+                    st.session_state["quiz_score"] = 0
+                    st.session_state["revealed"] = False
+                    st.rerun()
+            else:
+                card = cards[idx]
+                st.markdown(f"**Card {idx + 1} of {len(cards)}**")
+                st.progress(idx / len(cards))
+                st.markdown("---")
+                st.subheader("❓ " + card["front"])
+                st.markdown("---")
+
+                if not revealed:
+                    if st.button("👁 Reveal Answer", use_container_width=True):
+                        st.session_state["revealed"] = True
+                        st.rerun()
+                else:
+                    st.info(card["back"])
+
+                    quiz_elab_key = f"elab_quiz_{idx}_{hash(card['front']) % 10000}"
+                    if quiz_elab_key in st.session_state:
+                        st.markdown("---")
+                        st.markdown("#### 💡 Deep Dive Explanation")
+                        st.markdown(st.session_state[quiz_elab_key])
+                    else:
+                        if st.button("💡 Elaborate explanation", key=f"btn_quiz_elab_{idx}"):
+                            with st.spinner("Asking Gemma 4 to elaborate…"):
+                                try:
+                                    elab_prompt = build_elaboration_prompt(
+                                        card["front"], card["back"], language
+                                    )
+                                    elab_contents = [
+                                        types.Content(parts=[types.Part.from_text(text=elab_prompt)])
+                                    ]
+                                    elab_text, _ = generate_with_fallback(
+                                        elab_contents, preferred_model=preferred_model
+                                    )
+                                    st.session_state[quiz_elab_key] = elab_text
+                                    st.rerun()
+                                except Exception as err:
+                                    st.error(f"Could not elaborate: {err}")
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ I knew it", use_container_width=True):
+                            st.session_state["quiz_score"] += 1
+                            st.session_state["quiz_index"] += 1
+                            st.session_state["revealed"] = False
+                            st.rerun()
+                    with col2:
+                        if st.button("🔁 Review again", use_container_width=True):
+                            cards.append(cards[idx])
+                            st.session_state["cards"] = cards
+                            st.session_state["quiz_index"] += 1
+                            st.session_state["revealed"] = False
+                            st.rerun()
+        else:
+            st.info("ℹ️ Quiz mode requires generated flashcards. Run synthesis in Flashcard mode first.")
+
+    # ----------------------------------------------------------------------- #
+    # 4. Counter-Question & Q&A Tab                                           #
+    # ----------------------------------------------------------------------- #
+    with tab_counter:
+        st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
+        st.caption(
+            "Challenge or probe any synthesized concept or formula. Gemma 4 provides rigorous STEM explanations."
+        )
+
+        # Build options from flashcards or formulas
+        q_options = []
+        q_lookup = {}
+        if has_cards:
+            for i, c in enumerate(st.session_state["cards"], start=1):
+                label = f"Flashcard #{i}: {c['front']}"
+                q_options.append(label)
+                q_lookup[label] = {"front": c["front"], "back": c["back"]}
+        if has_formulas:
+            for i, f in enumerate(st.session_state["formulas"], start=1):
+                label = f"Formula #{i}: {f['name']} ({f.get('latex_equation', '')})"
+                q_options.append(label)
+                q_lookup[label] = {
+                    "front": f"{f['name']}: {f.get('latex_equation', '')}",
+                    "back": f"{f.get('description', '')}. Validity: {f.get('assumptions', '')}",
+                }
+
+        if q_options:
+            selected_item = st.selectbox(
+                "Select Concept or Formula to Probe",
+                options=q_options,
+                index=0,
+            )
+            context = q_lookup[selected_item]
+
+            with st.container(border=True):
+                st.markdown(f"**Concept:** {context['front']}")
+                st.markdown(f"**Answer / Law:** {context['back']}")
+
+            if "counter_history" not in st.session_state:
+                st.session_state["counter_history"] = {}
+
+            history_key = f"q_{abs(hash(selected_item)) % 100000}"
+            current_history = st.session_state["counter_history"].get(history_key, [])
+
+            if current_history:
+                st.markdown("#### Discussion History")
+                for item in current_history:
+                    with st.chat_message("user"):
+                        st.write(item["query"])
+                    with st.chat_message("assistant"):
+                        st.markdown(item["response"])
+                        st.caption(
+                            f"<small>Answered by <b>{item.get('model', 'Gemma 4')}</b></small>",
+                            unsafe_allow_html=True,
+                        )
+
+            user_query = st.text_area(
+                "Your Counter-Question or Query",
+                placeholder="e.g., Why does this formula assume an ideal gas? What breaks down at relativistic speeds? What is the physical meaning of this constant?",
+                key=f"query_input_{history_key}",
+                height=100,
+            )
+
+            if st.button("🚀 Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
+                if not user_query.strip():
+                    st.warning("Please type a question before asking.")
+                else:
+                    with st.spinner(f"Asking {preferred_model} to analyze your question…"):
+                        try:
+                            counter_prompt = build_counter_question_prompt(
+                                context["front"],
+                                context["back"],
+                                user_query.strip(),
+                                language,
+                            )
+                            contents = [types.Content(parts=[types.Part.from_text(text=counter_prompt)])]
+                            answer, ans_model = generate_with_fallback(
+                                contents, preferred_model=preferred_model
+                            )
+
+                            if history_key not in st.session_state["counter_history"]:
+                                st.session_state["counter_history"][history_key] = []
+
+                            st.session_state["counter_history"][history_key].append({
+                                "query": user_query.strip(),
+                                "response": answer,
+                                "model": ans_model,
+                            })
+                            st.rerun()
+                        except RuntimeError as err:
+                            st.error(f"❌ Error getting response from Gemma 4: {err}")
+        else:
+            st.info("ℹ️ Run generation first to populate concepts and formulas for Q&A.")
 
 # --------------------------------------------------------------------------- #
 # Footer                                                                       #
