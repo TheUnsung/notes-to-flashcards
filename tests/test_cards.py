@@ -77,6 +77,23 @@ class TestParseCards:
         cards = parse_cards(raw)
         assert cards[0]["back"] == "A"
 
+    def test_handles_unescaped_latex_backslashes(self):
+        """Unescaped LaTeX commands like \\pm, \\frac, \\alpha should parse cleanly."""
+        raw = r'''[
+            {"front": "What is the uncertainty?", "back": "\pm 1 in the last digit and \frac{a}{b}."},
+            {"front": "What is the angle?", "back": "\theta = 45\degree."}
+        ]'''
+        cards = parse_cards(raw)
+        assert len(cards) == 2
+        assert "\\pm 1" in cards[0]["back"]
+
+    def test_handles_conversational_wrapper(self):
+        """Conversational text around the JSON array should be stripped automatically."""
+        raw = 'Here are your flashcards based on the notes:\n[{"front": "Q", "back": "A"}]\nHope this helps!'
+        cards = parse_cards(raw)
+        assert len(cards) == 1
+        assert cards[0]["front"] == "Q"
+
     def test_extra_keys_are_ignored(self):
         raw = json.dumps([{"front": "Q", "back": "A", "extra": "ignored"}])
         cards = parse_cards(raw)

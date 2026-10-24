@@ -125,12 +125,21 @@ def shrink_image(image_bytes: bytes, max_side: int = 1600, quality: int = 85) ->
 # Matches optional language tag after the opening fence (```json or ``` alone)
 _FENCE_RE = re.compile(r"^```[a-zA-Z]*\n?(.*?)\n?```$", re.DOTALL)
 
+# Matches unescaped backslashes in JSON (e.g. LaTeX formulas like \pm, \frac, \alpha)
+_INVALID_ESCAPE_RE = re.compile(r'\\(?![/\"\\bfnrt]|u[0-9a-fA-F]{4})')
+
+
+def _clean_json_escapes(s: str) -> str:
+    r"""Escape unescaped backslashes (such as LaTeX \pm, \frac, etc.) in JSON strings."""
+    return _INVALID_ESCAPE_RE.sub(r'\\\\', s)
+
 
 def parse_cards(raw: str) -> list[dict[str, str]]:
-    """
+    r"""
     Parse the model's raw text response into a list of flashcard dicts.
 
-    Strips Markdown code fences (```json ... ``` or ``` ... ```) and surrounding
+    Strips Markdown code fences (```json ... ``` or ``` ... ```), handles
+    unescaped LaTeX backslashes (e.g. \pm, \approx, \frac), and surrounding
     whitespace before attempting json.loads.
 
     Returns a list like [{"front": "...", "back": "..."}, ...].
@@ -154,14 +163,28 @@ def parse_cards(raw: str) -> list[dict[str, str]]:
         lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
         text = "\n".join(lines).strip()
 
+    # Multi-stage parsing: handles raw JSON, bracketed JSON with conversational wrapper,
+    # and unescaped math/LaTeX backslashes.
+    data: Any = None
     try:
-        data: Any = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError(
-            f"Could not parse the model response as JSON.\n"
-            f"Details: {exc}\n"
-            f"Raw response (first 300 chars): {raw[:300]}"
-        ) from exc
+        data = json.loads(text, strict=False)
+    except json.JSONDecodeError:
+        start = text.find("[")
+        end = text.rfind("]")
+        candidate = text[start : end + 1] if (start != -1 and end != -1 and end > start) else text
+
+        try:
+            data = json.loads(candidate, strict=False)
+        except json.JSONDecodeError:
+            try:
+                fixed = _clean_json_escapes(candidate)
+                data = json.loads(fixed, strict=False)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Could not parse the model response as JSON.\n"
+                    f"Details: {exc}\n"
+                    f"Raw response (first 300 chars): {raw[:300]}"
+                ) from exc
 
     if not isinstance(data, list):
         raise ValueError(
