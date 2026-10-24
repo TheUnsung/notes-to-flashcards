@@ -13,6 +13,7 @@ from PIL import Image
 
 from cards import (
     build_prompt,
+    build_elaboration_prompt,
     parse_cards,
     cards_to_csv,
     shrink_image,
@@ -228,6 +229,22 @@ class TestBuildPrompt:
 
     def test_returns_string(self):
         assert isinstance(build_prompt(8, "English"), str)
+
+    def test_elaborate_option_changes_rule(self):
+        prompt_normal = build_prompt(5, "English", elaborate=False)
+        prompt_elaborate = build_prompt(5, "English", elaborate=True)
+        assert "at most 2 sentences" in prompt_normal
+        assert "elaborated explanation" in prompt_elaborate
+
+    def test_build_elaboration_prompt_english(self):
+        prompt = build_elaboration_prompt("What is F=ma?", "Newton's 2nd law", "English")
+        assert "What is F=ma?" in prompt
+        assert "Newton's 2nd law" in prompt
+        assert "Explain in English" in prompt
+
+    def test_build_elaboration_prompt_hindi(self):
+        prompt = build_elaboration_prompt("What is F=ma?", "Newton's 2nd law", "Hindi")
+        assert "Hindi (Devanagari script)" in prompt
 
 
 # =========================================================================== #

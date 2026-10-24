@@ -15,13 +15,25 @@ from PIL import Image
 # Prompt builder                                                               #
 # --------------------------------------------------------------------------- #
 
-def build_prompt(num_cards: int, language: str) -> str:
+def build_prompt(num_cards: int, language: str, elaborate: bool = False) -> str:
     """Return the system-style instruction sent alongside the image."""
     lang_note = (
         "Respond in Hindi (Devanagari script)."
         if language == "Hindi"
         else "Respond in English."
     )
+    if elaborate:
+        back_rule = (
+            "4. 'back' is an elaborated explanation (3 to 4 sentences): clearly state "
+            "the core answer, explain the underlying principle or mechanism in depth, "
+            "and preserve all formulas, symbols, and units exactly as they appear."
+        )
+    else:
+        back_rule = (
+            "4. 'back' is the answer in at most 2 sentences; preserve formulas, "
+            "symbols, and units exactly as they appear in the image."
+        )
+
     return (
         f"You are an expert STEM tutor helping a student memorise key ideas "
         f"from their notes or textbook page.\n\n"
@@ -30,8 +42,7 @@ def build_prompt(num_cards: int, language: str) -> str:
         f"in the image.\n"
         f"2. Each flashcard covers ONE distinct idea, fact, formula, or term.\n"
         f"3. 'front' is a concise question (one sentence, ≤15 words).\n"
-        f"4. 'back' is the answer in at most 2 sentences; preserve formulas, "
-        f"symbols, and units exactly as they appear in the image.\n"
+        f"{back_rule}\n"
         f"5. Use ONLY information visible in the image – do not add outside "
         f"knowledge.\n"
         f"6. {lang_note}\n"
@@ -41,6 +52,26 @@ def build_prompt(num_cards: int, language: str) -> str:
         f'[{{"front": "What is Newton\'s second law?", '
         f'"back": "F = ma, where F is force in Newtons, m is mass in kg, '
         f'and a is acceleration in m/s²."}}]'
+    )
+
+
+def build_elaboration_prompt(front: str, back: str, language: str) -> str:
+    """Return a prompt asking Gemma 4 to deeply explain a specific flashcard concept."""
+    lang_note = (
+        "Explain in Hindi (Devanagari script)."
+        if language == "Hindi"
+        else "Explain in English."
+    )
+    return (
+        f"You are an expert STEM tutor. A student studying from their notes wants a "
+        f"clear, detailed, and elaborated explanation of this flashcard:\n\n"
+        f"Question: {front}\n"
+        f"Brief Answer: {back}\n\n"
+        f"Please provide an elaborated explanation structured as follows:\n"
+        f"- **Core Concept & Intuition**: Explain the fundamental principle in simple terms.\n"
+        f"- **Step-by-step Breakdown**: How does it work? Detail any equations, variables, or units.\n"
+        f"- **Practical Application / Example**: A real-world example or common problem scenario.\n\n"
+        f"Keep the tone encouraging and academic. {lang_note}"
     )
 
 

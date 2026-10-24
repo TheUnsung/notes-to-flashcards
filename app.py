@@ -18,6 +18,7 @@ from google.genai import types
 
 from cards import (
     build_prompt,
+    build_elaboration_prompt,
     parse_cards,
     cards_to_csv,
     shrink_image,
@@ -234,6 +235,11 @@ with st.sidebar:
         index=0,
         help="Language for the flashcard text.",
     )
+    elaborate_mode = st.checkbox(
+        "Elaborate explanations",
+        value=False,
+        help="Generate in-depth explanations on the card backs (principles & mechanisms).",
+    )
     st.divider()
     # Footer updated after a successful run (see below); show default for now
     st.markdown(
@@ -298,7 +304,7 @@ if uploaded:
         # Shrink before sending
         image_bytes, mime_type = shrink_image(active_image_bytes)
 
-        prompt = build_prompt(num_cards, language)
+        prompt = build_prompt(num_cards, language, elaborate=elaborate_mode)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         text_part  = types.Part.from_text(text=prompt)
         contents   = [types.Content(parts=[image_part, text_part])]
@@ -345,6 +351,22 @@ if "cards" in st.session_state and st.session_state["cards"]:
         for i, card in enumerate(cards, start=1):
             with st.expander(f"Card {i}: {card['front']}"):
                 st.markdown(card["back"])
+
+                # Option to elaborate this specific card
+                elab_key = f"elab_browse_{i}_{hash(card['front']) % 10000}"
+                if elab_key in st.session_state:
+                    st.info(st.session_state[elab_key])
+                else:
+                    if st.button("💡 Elaborate explanation", key=f"btn_elab_{i}"):
+                        with st.spinner("Asking Gemma 4 to elaborate…"):
+                            try:
+                                elab_prompt = build_elaboration_prompt(card["front"], card["back"], language)
+                                elab_contents = [types.Content(parts=[types.Part.from_text(text=elab_prompt)])]
+                                elab_text, _ = generate_with_fallback(elab_contents, preferred_model=preferred_model)
+                                st.session_state[elab_key] = elab_text
+                                st.rerun()
+                            except Exception as err:
+                                st.error(f"Could not elaborate: {err}")
 
         st.divider()
 
@@ -397,6 +419,25 @@ if "cards" in st.session_state and st.session_state["cards"]:
                     st.rerun()
             else:
                 st.info(card["back"])
+
+                # Option to elaborate while quizzing
+                quiz_elab_key = f"elab_quiz_{idx}_{hash(card['front']) % 10000}"
+                if quiz_elab_key in st.session_state:
+                    st.markdown("---")
+                    st.markdown("#### 💡 Deep Dive Explanation")
+                    st.markdown(st.session_state[quiz_elab_key])
+                else:
+                    if st.button("💡 Elaborate explanation", key=f"btn_quiz_elab_{idx}"):
+                        with st.spinner("Asking Gemma 4 to elaborate…"):
+                            try:
+                                elab_prompt = build_elaboration_prompt(card["front"], card["back"], language)
+                                elab_contents = [types.Content(parts=[types.Part.from_text(text=elab_prompt)])]
+                                elab_text, _ = generate_with_fallback(elab_contents, preferred_model=preferred_model)
+                                st.session_state[quiz_elab_key] = elab_text
+                                st.rerun()
+                            except Exception as err:
+                                st.error(f"Could not elaborate: {err}")
+
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("✅ I knew it", use_container_width=True):
