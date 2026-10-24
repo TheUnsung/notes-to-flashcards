@@ -682,7 +682,7 @@ class TestParseFormulas:
         assert res[0]["name"] == "Ohm's Law"
 
     def test_handles_markdown_formula_fallback(self):
-        raw = """Based on the notes, here is the formula:
+        raw = r"""Based on the notes, here is the formula:
 **Wavelength**: $$\lambda = \frac{\beta d}{D}$$
 Valid for Fresnel biprism."""
         res = parse_formulas(raw)

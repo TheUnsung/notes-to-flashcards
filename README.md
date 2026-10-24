@@ -23,7 +23,15 @@ Supports both **local execution** (via `.env`) and **Streamlit Community Cloud**
 |:---:|:---:|
 | ![Formula Extractor](screenshots/formula_extractor.png) | ![Study Flashcards](screenshots/flashcards.png) |
 
-> _To add your own screenshots, save your images as `screenshots/formula_extractor.png` and `screenshots/flashcards.png`._
+| 🎯 Quiz Mode | 💬 Counter-Question & Q&A |
+|:---:|:---:|
+| ![Quiz Mode](screenshots/quiz_mode.png) | ![Counter Question](screenshots/counter_question.png) |
+
+> _To add or update your screenshots, save your images in the `screenshots/` directory with these filenames:_
+> - `screenshots/formula_extractor.png`
+> - `screenshots/flashcards.png`
+> - `screenshots/quiz_mode.png`
+> - `screenshots/counter_question.png`
 
 ---
 
@@ -105,7 +113,7 @@ Supports both **local execution** (via `.env`) and **Streamlit Community Cloud**
 ```bash
 python -m pytest tests/test_cards.py -v
 ```
-All 79 unit tests run completely offline with mocked API responses.
+All 82 unit tests run completely offline with mocked API responses.
 
 ---
 
@@ -119,7 +127,11 @@ All 79 unit tests run completely offline with mocked API responses.
 ├── .gitignore           # Ignores .env, .venv, bytecode, and temporary files
 ├── README.md            # Documentation and setup instructions
 ├── screenshots/         # Application preview screenshots
+│   ├── formula_extractor.png
+│   ├── flashcards.png
+│   ├── quiz_mode.png
+│   └── counter_question.png
 └── tests/
-    ├── test_cards.py    # Pytest test suite (79 tests)
+    ├── test_cards.py    # Pytest test suite (82 tests)
     └── create_sample.py # Test image utility
 ```
