@@ -237,6 +237,11 @@ class TestBuildPrompt:
         assert "at most 2 sentences" in prompt_normal
         assert "elaborated explanation" in prompt_elaborate
 
+    def test_prompt_requests_equations_and_formulae(self):
+        prompt = build_prompt(5, "English")
+        assert "equations" in prompt.lower()
+        assert "formulae" in prompt.lower()
+
     def test_build_elaboration_prompt_english(self):
         prompt = build_elaboration_prompt("What is F=ma?", "Newton's 2nd law", "English")
         assert "What is F=ma?" in prompt

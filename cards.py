@@ -26,12 +26,14 @@ def build_prompt(num_cards: int, language: str, elaborate: bool = False) -> str:
         back_rule = (
             "4. 'back' is an elaborated explanation (3 to 4 sentences): clearly state "
             "the core answer, explain the underlying principle or mechanism in depth, "
-            "and preserve all formulas, symbols, and units exactly as they appear."
+            "and ALWAYS include relevant mathematical equations, scientific formulae, "
+            "variable definitions, and exact units wherever applicable."
         )
     else:
         back_rule = (
-            "4. 'back' is the answer in at most 2 sentences; preserve formulas, "
-            "symbols, and units exactly as they appear in the image."
+            "4. 'back' is the answer in at most 2 sentences. ALWAYS include relevant "
+            "mathematical equations, scientific formulae, symbols, and exact units wherever applicable, "
+            "preserving them exactly as they appear in the image."
         )
 
     return (
@@ -43,10 +45,11 @@ def build_prompt(num_cards: int, language: str, elaborate: bool = False) -> str:
         f"2. Each flashcard covers ONE distinct idea, fact, formula, or term.\n"
         f"3. 'front' is a concise question (one sentence, ≤15 words).\n"
         f"{back_rule}\n"
-        f"5. Use ONLY information visible in the image – do not add outside "
+        f"5. Include relevant equations and formulae wherever applicable.\n"
+        f"6. Use ONLY information visible in the image – do not add outside "
         f"knowledge.\n"
-        f"6. {lang_note}\n"
-        f"7. Return ONLY a JSON array of objects, each with exactly the keys "
+        f"7. {lang_note}\n"
+        f"8. Return ONLY a JSON array of objects, each with exactly the keys "
         f"\"front\" and \"back\". No markdown fences, no extra keys, no prose.\n\n"
         f"Example format:\n"
         f'[{{"front": "What is Newton\'s second law?", '

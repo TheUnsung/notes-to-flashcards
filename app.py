@@ -236,11 +236,6 @@ with st.sidebar:
         index=0,
         help="Language for the flashcard text.",
     )
-    elaborate_mode = st.checkbox(
-        "Elaborate explanations",
-        value=False,
-        help="Generate in-depth explanations on the card backs (principles & mechanisms).",
-    )
     st.divider()
     # Footer updated after a successful run (see below); show default for now
     st.markdown(
@@ -305,7 +300,7 @@ if uploaded:
         # Shrink before sending
         image_bytes, mime_type = shrink_image(active_image_bytes)
 
-        prompt = build_prompt(num_cards, language, elaborate=elaborate_mode)
+        prompt = build_prompt(num_cards, language)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         text_part  = types.Part.from_text(text=prompt)
         contents   = [types.Content(parts=[image_part, text_part])]
