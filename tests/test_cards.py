@@ -11,7 +11,14 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 from PIL import Image
 
-from cards import build_prompt, parse_cards, cards_to_csv, shrink_image
+from cards import (
+    build_prompt,
+    parse_cards,
+    cards_to_csv,
+    shrink_image,
+    pdf_page_to_image,
+    get_pdf_page_count,
+)
 
 # =========================================================================== #
 # Helpers                                                                      #
@@ -347,16 +354,12 @@ class TestGenerateWithFallback:
         assert model == MODELS[0]
         assert text  == GOOD_JSON
 
-    def test_503_retried_twice_then_fallback(self):
-        """Model 0 fails all retries → falls back to model 1 which succeeds."""
+    def test_503_retried_five_times_then_fallback(self):
+        """Model 0 fails all 5 retries (6 attempts total) → falls back to model 1 which succeeds."""
         from app import generate_with_fallback, MODELS
 
         client = self._patch_client({
-            MODELS[0]: [
-                _api_error("503 UNAVAILABLE"),
-                _api_error("503 UNAVAILABLE"),
-                _api_error("503 UNAVAILABLE"),
-            ],
+            MODELS[0]: [_api_error("503 UNAVAILABLE")] * 6,
             MODELS[1]: [GOOD_JSON],
         })
         with patch("app.genai.Client", return_value=client), \
@@ -402,7 +405,7 @@ class TestGenerateWithFallback:
         from app import generate_with_fallback, MODELS
 
         client = self._patch_client({
-            m: [_api_error("500 INTERNAL")] * 3 for m in MODELS
+            m: [_api_error("500 INTERNAL")] * 6 for m in MODELS
         })
         with patch("app.genai.Client", return_value=client), \
              patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}), \
@@ -467,3 +470,52 @@ class TestGenerateWithFallback:
         csv_text = cards_to_csv(cards)
         rows = list(csv.reader(io.StringIO(csv_text)))
         assert rows[0] == ["Q", "A"]
+
+
+# =========================================================================== #
+# PDF support tests                                                            #
+# =========================================================================== #
+
+class TestPDF:
+    def _create_pdf(self, pages: int = 1) -> bytes:
+        import pymupdf
+        doc = pymupdf.open()
+        for i in range(pages):
+            page = doc.new_page(width=300, height=300)
+            page.insert_text((40, 40), f"PDF Page Content {i + 1}")
+        return doc.tobytes()
+
+    def test_get_page_count_single_page(self):
+        pdf_bytes = self._create_pdf(1)
+        assert get_pdf_page_count(pdf_bytes) == 1
+
+    def test_get_page_count_multi_page(self):
+        pdf_bytes = self._create_pdf(3)
+        assert get_pdf_page_count(pdf_bytes) == 3
+
+    def test_get_page_count_invalid_pdf(self):
+        with pytest.raises(ValueError, match="Could not read PDF"):
+            get_pdf_page_count(b"not a real pdf content")
+
+    def test_pdf_page_to_image_renders_png(self):
+        pdf_bytes = self._create_pdf(2)
+        png_bytes = pdf_page_to_image(pdf_bytes, page_number=0)
+        assert isinstance(png_bytes, bytes)
+        img = Image.open(io.BytesIO(png_bytes))
+        assert img.format == "PNG"
+        assert img.width > 0 and img.height > 0
+
+    def test_pdf_page_out_of_range(self):
+        pdf_bytes = self._create_pdf(1)
+        with pytest.raises(ValueError, match="out of range"):
+            pdf_page_to_image(pdf_bytes, page_number=5)
+
+    def test_pdf_page_negative_index(self):
+        pdf_bytes = self._create_pdf(1)
+        with pytest.raises(ValueError, match="out of range"):
+            pdf_page_to_image(pdf_bytes, page_number=-1)
+
+    def test_pdf_page_invalid_bytes(self):
+        with pytest.raises(ValueError, match="Could not open PDF"):
+            pdf_page_to_image(b"invalid data", page_number=0)
+

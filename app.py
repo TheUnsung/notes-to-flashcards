@@ -16,7 +16,14 @@ from PIL import Image
 from google import genai
 from google.genai import types
 
-from cards import build_prompt, parse_cards, cards_to_csv, shrink_image
+from cards import (
+    build_prompt,
+    parse_cards,
+    cards_to_csv,
+    shrink_image,
+    pdf_page_to_image,
+    get_pdf_page_count,
+)
 
 # --------------------------------------------------------------------------- #
 # Model list – Gemma 4 only.  First entry is the default preferred model.     #
@@ -31,8 +38,8 @@ MODELS = [
 # --------------------------------------------------------------------------- #
 
 # Per-model retry: how many *extra* attempts after the first
-_MODEL_RETRIES = 2          # → up to 3 attempts per model
-_RETRY_DELAYS  = [2, 4]     # seconds between attempts (len == _MODEL_RETRIES)
+_MODEL_RETRIES = 5          # → auto change model if one takes more than 5 retries
+_RETRY_DELAYS  = [2, 4, 8, 16, 32]  # seconds between attempts (len == _MODEL_RETRIES)
 
 # Error signals that trigger a same-model retry (transient server errors)
 _RETRYABLE_SIGNALS   = ("500", "503", "internal", "unavailable")
@@ -136,7 +143,15 @@ def generate_with_fallback(
                     time.sleep(wait)
                     continue  # same model, next attempt
 
-                # Unknown error or retries exhausted – move to next model
+                # Unknown error or retries exhausted – notify and move to next model
+                if attempt >= _MODEL_RETRIES:
+                    try:
+                        st.toast(
+                            f"⚠️ {model} exceeded {_MODEL_RETRIES} retries. Automatically switching to fallback model…",
+                            icon="🔀",
+                        )
+                    except Exception:
+                        pass
                 break
 
     # All models exhausted
@@ -216,19 +231,52 @@ with st.sidebar:
     )
 
 # --------------------------------------------------------------------------- #
-# Image upload                                                                 #
+# Image / PDF upload                                                           #
 # --------------------------------------------------------------------------- #
 
 uploaded = st.file_uploader(
-    "Upload your notes image",
-    type=["png", "jpg", "jpeg"],
-    help="Supports PNG, JPG, JPEG. Large images are automatically resized.",
+    "Upload your notes (Image or PDF)",
+    type=["png", "jpg", "jpeg", "pdf"],
+    help="Supports PNG, JPG, JPEG, and PDF documents. Large files are automatically processed.",
 )
 
 if uploaded:
     raw_bytes = uploaded.read()
-    img = Image.open(io.BytesIO(raw_bytes))
-    st.image(img, caption=uploaded.name, use_container_width=True)
+    is_pdf = uploaded.name.lower().endswith(".pdf") or uploaded.type == "application/pdf"
+
+    if is_pdf:
+        try:
+            total_pages = get_pdf_page_count(raw_bytes)
+        except ValueError as err:
+            st.error(f"❌ **Invalid PDF:** {err}")
+            st.stop()
+
+        if total_pages > 1:
+            selected_page = st.number_input(
+                f"Select page to study (1 to {total_pages})",
+                min_value=1,
+                max_value=total_pages,
+                value=1,
+                step=1,
+                help="Pick which page of the PDF to generate flashcards from.",
+            )
+        else:
+            selected_page = 1
+
+        try:
+            preview_bytes = pdf_page_to_image(raw_bytes, page_number=selected_page - 1)
+        except ValueError as err:
+            st.error(f"❌ **Could not render PDF page:** {err}")
+            st.stop()
+
+        img = Image.open(io.BytesIO(preview_bytes))
+        st.image(img, caption=f"{uploaded.name} (Page {selected_page} of {total_pages})", use_container_width=True)
+        active_image_bytes = preview_bytes
+    else:
+        img = Image.open(io.BytesIO(raw_bytes))
+        st.image(img, caption=uploaded.name, use_container_width=True)
+        active_image_bytes = raw_bytes
+
     st.divider()
 
     # ----------------------------------------------------------------------- #
@@ -237,7 +285,7 @@ if uploaded:
 
     if st.button("✨ Make flashcards", type="primary", use_container_width=True):
         # Shrink before sending
-        image_bytes, mime_type = shrink_image(raw_bytes)
+        image_bytes, mime_type = shrink_image(active_image_bytes)
 
         prompt = build_prompt(num_cards, language)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)

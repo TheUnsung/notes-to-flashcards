@@ -45,8 +45,55 @@ def build_prompt(num_cards: int, language: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Image shrinker                                                               #
+# Image shrinker & PDF converter                                               #
 # --------------------------------------------------------------------------- #
+
+def get_pdf_page_count(pdf_bytes: bytes) -> int:
+    """Return the total number of pages in the given PDF bytes."""
+    import pymupdf
+    try:
+        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+        return len(doc)
+    except Exception as exc:
+        raise ValueError(f"Could not read PDF document: {exc}") from exc
+
+
+def pdf_page_to_image(
+    pdf_bytes: bytes,
+    page_number: int = 0,
+    dpi_scale: float = 2.0,
+) -> bytes:
+    """
+    Render a single page of a PDF to PNG image bytes for Gemma 4 consumption.
+
+    Args:
+        pdf_bytes: Raw bytes of the PDF file.
+        page_number: 0-indexed page number to render.
+        dpi_scale: Scale factor for rendering resolution (default 2.0 ≈ 144-200 DPI).
+
+    Returns:
+        PNG image bytes.
+    """
+    import pymupdf
+    try:
+        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    except Exception as exc:
+        raise ValueError(f"Could not open PDF file: {exc}") from exc
+
+    if len(doc) == 0:
+        raise ValueError("PDF document has no pages.")
+
+    if page_number < 0 or page_number >= len(doc):
+        raise ValueError(
+            f"Page number {page_number + 1} is out of range. "
+            f"PDF has {len(doc)} page(s)."
+        )
+
+    page = doc[page_number]
+    matrix = pymupdf.Matrix(dpi_scale, dpi_scale)
+    pix = page.get_pixmap(matrix=matrix)
+    return pix.tobytes("png")
+
 
 def shrink_image(image_bytes: bytes, max_side: int = 1600, quality: int = 85) -> tuple[bytes, str]:
     """

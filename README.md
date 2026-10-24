@@ -7,9 +7,11 @@
 
 ## What the project does
 
-Upload a photo of handwritten notes or a textbook page and **Gemma 4** reads the
-image and generates study flashcards instantly.
+Upload a photo of handwritten notes, a textbook page, or a PDF document and
+**Gemma 4** reads the page and generates study flashcards instantly.
 
+- **Image & PDF support** – upload PNG, JPG, JPEG, or multi-page PDF documents
+  (select specific pages to study).
 - **Browse mode** – all cards shown in expandable panels.  
 - **Quiz mode** – one card at a time: reveal the answer, mark _I knew it_ or
   _Review again_, and get a final score.  
@@ -45,7 +47,7 @@ If it is busy or unavailable, it automatically falls back to the other model.
 
 | Error type | Action |
 |---|---|
-| 500 / 503 / INTERNAL / UNAVAILABLE | Retry the same model (up to 2 more times, with 2 s and 4 s waits) |
+| 500 / 503 / INTERNAL / UNAVAILABLE | Retry the same model up to 5 times (2 s, 4 s, 8 s, 16 s, 32 s); automatically switches to fallback model if it exceeds 5 retries |
 | 404 / model not found | Skip to the next model immediately |
 | 400 / 401 / 403 / bad API key | Stop with a clear error message – no retries |
 | All models exhausted | Show a clear error; image stays in place so the user can retry |
