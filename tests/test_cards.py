@@ -13,13 +13,19 @@ from PIL import Image
 
 from cards import (
     build_prompt,
+    build_formula_synthesizer_prompt,
+    build_concept_graph_prompt,
     build_elaboration_prompt,
     build_counter_question_prompt,
     parse_cards,
+    parse_formulas,
+    clean_dot_code,
     cards_to_csv,
     shrink_image,
     pdf_page_to_image,
     get_pdf_page_count,
+    fetch_wikipedia_stem_text,
+    fetch_arxiv_stem_text,
 )
 
 # =========================================================================== #
@@ -579,4 +585,176 @@ class TestPDF:
     def test_pdf_page_invalid_bytes(self):
         with pytest.raises(ValueError, match="Could not open PDF"):
             pdf_page_to_image(b"invalid data", page_number=0)
+
+
+# =========================================================================== #
+# parse_formulas                                                              #
+# =========================================================================== #
+
+class TestParseFormulas:
+    def test_valid_single_formula(self):
+        raw = json.dumps([
+            {
+                "name": "Newton's Second Law",
+                "latex_equation": "F = m \\cdot a",
+                "description": "Relates net force to mass and acceleration.",
+                "variables": [
+                    {"symbol": "F", "definition": "Force", "unit": "N"},
+                    {"symbol": "m", "definition": "Mass", "unit": "kg"},
+                    {"symbol": "a", "definition": "Acceleration", "unit": "m/s^2"},
+                ],
+                "assumptions": "Constant mass, inertial frame.",
+            }
+        ])
+        formulas = parse_formulas(raw)
+        assert len(formulas) == 1
+        assert formulas[0]["name"] == "Newton's Second Law"
+        assert formulas[0]["latex_equation"] == "F = m \\cdot a"
+        assert len(formulas[0]["variables"]) == 3
+        assert formulas[0]["assumptions"] == "Constant mass, inertial frame."
+
+    def test_strips_fenced_json(self):
+        data = [
+            {
+                "name": "Ohm's Law",
+                "latex_equation": "V = I \\cdot R",
+                "description": "Potential difference proportional to current.",
+                "variables": [
+                    {"symbol": "V", "definition": "Voltage", "unit": "V"},
+                ],
+                "assumptions": "Constant temperature.",
+            }
+        ]
+        raw = f"```json\n{json.dumps(data)}\n```"
+        res = parse_formulas(raw)
+        assert len(res) == 1
+        assert res[0]["name"] == "Ohm's Law"
+
+    def test_handles_unescaped_latex_in_formulas(self):
+        raw = r'''[
+            {
+                "name": "De Broglie Wavelength",
+                "latex_equation": "\lambda = \frac{h}{p}",
+                "description": "Wave-particle duality wavelength.",
+                "variables": [
+                    {"symbol": "\lambda", "definition": "Wavelength", "unit": "m"},
+                    {"symbol": "p", "definition": "Momentum", "unit": "kg*m/s"}
+                ],
+                "assumptions": "Non-zero momentum."
+            }
+        ]'''
+        res = parse_formulas(raw)
+        assert len(res) == 1
+        assert "\\lambda" in res[0]["latex_equation"]
+        assert "\\frac" in res[0]["latex_equation"]
+
+    def test_empty_input_raises_error(self):
+        with pytest.raises(ValueError, match="empty formula synthesis response"):
+            parse_formulas("")
+
+    def test_non_list_raises_error(self):
+        with pytest.raises(ValueError, match="Expected a JSON list of formulas"):
+            parse_formulas(json.dumps({"error": "not a list"}))
+
+
+# =========================================================================== #
+# clean_dot_code                                                              #
+# =========================================================================== #
+
+class TestCleanDotCode:
+    def test_clean_dot_already_valid(self):
+        dot = 'digraph G {\n  A -> B;\n}'
+        assert clean_dot_code(dot) == dot
+
+    def test_strips_markdown_fences(self):
+        dot = 'digraph STEM {\n  "Thermodynamics" -> "Carnot Engine";\n}'
+        raw = f"```dot\n{dot}\n```"
+        assert clean_dot_code(raw) == dot
+
+    def test_extracts_digraph_from_conversational_wrapper(self):
+        raw = 'Here is your concept map:\n\ndigraph STEM {\n  A -> B;\n}\n\nHope this is useful!'
+        assert clean_dot_code(raw) == 'digraph STEM {\n  A -> B;\n}'
+
+    def test_empty_or_whitespace_returns_empty(self):
+        assert clean_dot_code("") == ""
+        assert clean_dot_code("   \n\t  ") == ""
+
+
+# =========================================================================== #
+# STEM Prompt Builders                                                        #
+# =========================================================================== #
+
+class TestSTEMPromptBuilders:
+    def test_build_formula_prompt_english(self):
+        prompt = build_formula_synthesizer_prompt("English")
+        assert "LaTeX" in prompt
+        assert "latex_equation" in prompt
+        assert "variables" in prompt
+        assert "assumptions" in prompt
+        assert "English" in prompt
+
+    def test_build_formula_prompt_hindi(self):
+        prompt = build_formula_synthesizer_prompt("Hindi")
+        assert "Hindi (Devanagari script)" in prompt
+
+    def test_build_concept_graph_prompt(self):
+        prompt = build_concept_graph_prompt("English")
+        assert "digraph STEM_Map" in prompt
+        assert "rankdir=TB" in prompt
+
+    def test_flashcard_prompt_enforces_latex(self):
+        prompt = build_prompt(5, "English", elaborate=True)
+        assert "$inline$" in prompt
+        assert "$$block$$" in prompt
+
+
+# =========================================================================== #
+# Open Data Fetching (Wikipedia & arXiv)                                       #
+# =========================================================================== #
+
+class TestOpenDataFetching:
+    def test_empty_topic_wikipedia_raises_value_error(self):
+        with pytest.raises(ValueError, match="Please provide a search topic"):
+            fetch_wikipedia_stem_text("")
+
+    def test_empty_query_arxiv_raises_value_error(self):
+        with pytest.raises(ValueError, match="Please provide a search query"):
+            fetch_arxiv_stem_text("")
+
+    @patch("wikipedia.search")
+    @patch("wikipedia.page")
+    def test_wikipedia_fetch_success(self, mock_page, mock_search):
+        mock_search.return_value = ["Photosynthesis"]
+        mock_p = MagicMock()
+        mock_p.title = "Photosynthesis"
+        mock_p.url = "https://en.wikipedia.org/wiki/Photosynthesis"
+        mock_p.summary = "Process used by plants."
+        mock_p.content = "Full content about photosynthesis."
+        mock_page.return_value = mock_p
+
+        res = fetch_wikipedia_stem_text("photosynthesis")
+        assert res["title"] == "Photosynthesis"
+        assert "Process used by plants" in res["summary"]
+        assert "Full content" in res["content"]
+
+    @patch("arxiv.Client")
+    def test_arxiv_fetch_success(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_paper = MagicMock()
+        mock_paper.title = "Quantum Computing Foundations"
+        mock_author = MagicMock()
+        mock_author.name = "Richard Feynman"
+        mock_paper.authors = [mock_author]
+        mock_paper.published.strftime.return_value = "1982-05-01"
+        mock_paper.summary = "Simulating physics with computers."
+        mock_paper.entry_id = "https://arxiv.org/abs/quant-ph/0000000"
+
+        mock_client.results.return_value = [mock_paper]
+        mock_client_cls.return_value = mock_client
+
+        papers = fetch_arxiv_stem_text("quantum physics")
+        assert len(papers) == 1
+        assert papers[0]["title"] == "Quantum Computing Foundations"
+        assert "Richard Feynman" in papers[0]["authors"]
+
 
