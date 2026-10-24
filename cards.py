@@ -75,6 +75,39 @@ def build_elaboration_prompt(front: str, back: str, language: str) -> str:
     )
 
 
+def build_counter_question_prompt(
+    card_front: str,
+    card_back: str,
+    user_query: str,
+    language: str,
+) -> str:
+    """
+    Build a prompt for Gemma 4 to answer a student's counter-question or query
+    about a specific flashcard.
+    """
+    lang_note = (
+        "Respond in Hindi (Devanagari script)."
+        if language == "Hindi"
+        else "Respond in English."
+    )
+    return (
+        f"You are an encouraging expert STEM tutor. A student has generated flashcards "
+        f"from their notes and has a follow-up query or counter-question about this specific card:\n\n"
+        f"--- Flashcard Context ---\n"
+        f"Question: {card_front}\n"
+        f"Current Answer: {card_back}\n\n"
+        f"--- Student's Query / Counter-Question ---\n"
+        f"{user_query}\n\n"
+        f"Instructions:\n"
+        f"1. Directly and clearly answer the student's question or resolve their confusion.\n"
+        f"2. Explain the scientific, physical, or mathematical reasoning step-by-step.\n"
+        f"3. If their question challenges the premise of the card, explain whether their reasoning "
+        f"is valid, under what conditions/edge cases it applies, or why the standard formula/answer holds.\n"
+        f"4. Keep all formulas, symbols, and units exact.\n"
+        f"5. Maintain an engaging, educational tutor tone. {lang_note}"
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Image shrinker & PDF converter                                               #
 # --------------------------------------------------------------------------- #

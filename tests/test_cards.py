@@ -14,6 +14,7 @@ from PIL import Image
 from cards import (
     build_prompt,
     build_elaboration_prompt,
+    build_counter_question_prompt,
     parse_cards,
     cards_to_csv,
     shrink_image,
@@ -244,6 +245,27 @@ class TestBuildPrompt:
 
     def test_build_elaboration_prompt_hindi(self):
         prompt = build_elaboration_prompt("What is F=ma?", "Newton's 2nd law", "Hindi")
+        assert "Hindi (Devanagari script)" in prompt
+
+    def test_build_counter_question_prompt_english(self):
+        prompt = build_counter_question_prompt(
+            "What is F=ma?",
+            "Newton's second law.",
+            "Why not m*v?",
+            "English",
+        )
+        assert "What is F=ma?" in prompt
+        assert "Newton's second law." in prompt
+        assert "Why not m*v?" in prompt
+        assert "Respond in English" in prompt
+
+    def test_build_counter_question_prompt_hindi(self):
+        prompt = build_counter_question_prompt(
+            "What is F=ma?",
+            "Newton's second law.",
+            "Explain in detail.",
+            "Hindi",
+        )
         assert "Hindi (Devanagari script)" in prompt
 
 

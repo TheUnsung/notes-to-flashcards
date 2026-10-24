@@ -12,9 +12,11 @@ Upload a photo of handwritten notes, a textbook page, or a PDF document and
 
 - **Image & PDF support** – upload PNG, JPG, JPEG, or multi-page PDF documents
   (select specific pages to study).
-- **Browse mode** – all cards shown in expandable panels.  
+- **Browse mode** – all cards shown in expandable panels with optional on-demand deep dives.  
 - **Quiz mode** – one card at a time: reveal the answer, mark _I knew it_ or
   _Review again_, and get a final score.  
+- **Counter-Question & Q&A** – select any card from a dropdown to challenge the concept,
+  ask follow-up queries, and get step-by-step explanations from Gemma 4.
 - **Anki export** – one-click CSV download ready to import into
   [Anki](https://apps.ankiweb.net/).
 

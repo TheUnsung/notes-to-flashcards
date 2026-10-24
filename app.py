@@ -19,6 +19,7 @@ from google.genai import types
 from cards import (
     build_prompt,
     build_elaboration_prompt,
+    build_counter_question_prompt,
     parse_cards,
     cards_to_csv,
     shrink_image,
@@ -342,7 +343,9 @@ if "cards" in st.session_state and st.session_state["cards"]:
 
     st.success(f"Generated {len(cards)} flashcard(s).")
 
-    tab_browse, tab_quiz = st.tabs(["📖 Browse Cards", "🎯 Quiz Mode"])
+    tab_browse, tab_quiz, tab_counter = st.tabs(
+        ["📖 Browse Cards", "🎯 Quiz Mode", "💬 Counter Question"]
+    )
 
     # ----------------------------------------------------------------------- #
     # Browse tab                                                               #
@@ -452,6 +455,86 @@ if "cards" in st.session_state and st.session_state["cards"]:
                         st.session_state["quiz_index"] += 1
                         st.session_state["revealed"]   = False
                         st.rerun()
+
+    # ----------------------------------------------------------------------- #
+    # Counter Question tab                                                     #
+    # ----------------------------------------------------------------------- #
+    with tab_counter:
+        st.markdown("### 💬 Counter-Question & Q&A")
+        st.caption(
+            "Challenge or question any flashcard concept. Gemma 4 will analyze "
+            "your query and explain the underlying STEM principles."
+        )
+
+        card_labels = [f"Card {i}: {c['front']}" for i, c in enumerate(cards, start=1)]
+        selected_card_label = st.selectbox(
+            "Select Flashcard Number to Counter-Question",
+            options=card_labels,
+            index=0,
+            help="Choose the card you want to ask questions about.",
+        )
+        selected_card_idx = card_labels.index(selected_card_label)
+        selected_card = cards[selected_card_idx]
+
+        # Display selected card context
+        with st.container(border=True):
+            st.markdown(f"**Question:** {selected_card['front']}")
+            st.markdown(f"**Flashcard Answer:** {selected_card['back']}")
+
+        if "counter_history" not in st.session_state:
+            st.session_state["counter_history"] = {}
+
+        history_key = f"card_{selected_card_idx}"
+        current_history = st.session_state["counter_history"].get(history_key, [])
+
+        # Display previous Q&A for this card if any
+        if current_history:
+            st.markdown("#### Discussion History")
+            for item in current_history:
+                with st.chat_message("user"):
+                    st.write(item["query"])
+                with st.chat_message("assistant"):
+                    st.markdown(item["response"])
+                    st.caption(
+                        f"<small>Answered by <b>{item.get('model', 'Gemma 4')}</b></small>",
+                        unsafe_allow_html=True,
+                    )
+
+        user_query = st.text_area(
+            "Your query or counter-question",
+            placeholder="e.g., Why does this formula assume constant acceleration? What happens in relativistic cases? Why is this unit used?",
+            key=f"input_query_{selected_card_idx}",
+            height=100,
+        )
+
+        if st.button("🚀 Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{selected_card_idx}"):
+            if not user_query.strip():
+                st.warning("Please type a question or query before asking.")
+            else:
+                with st.spinner(f"Asking {preferred_model} to analyze your question…"):
+                    try:
+                        counter_prompt = build_counter_question_prompt(
+                            selected_card["front"],
+                            selected_card["back"],
+                            user_query.strip(),
+                            language,
+                        )
+                        contents = [types.Content(parts=[types.Part.from_text(text=counter_prompt)])]
+                        answer, ans_model = generate_with_fallback(
+                            contents, preferred_model=preferred_model
+                        )
+
+                        if history_key not in st.session_state["counter_history"]:
+                            st.session_state["counter_history"][history_key] = []
+
+                        st.session_state["counter_history"][history_key].append({
+                            "query": user_query.strip(),
+                            "response": answer,
+                            "model": ans_model,
+                        })
+                        st.rerun()
+                    except RuntimeError as err:
+                        st.error(f"❌ Error getting response from Gemma 4: {err}")
 
 # --------------------------------------------------------------------------- #
 # Footer                                                                       #
