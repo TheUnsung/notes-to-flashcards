@@ -165,11 +165,14 @@ def pdf_page_to_image(
 def shrink_image(image_bytes: bytes, max_side: int = 1600, quality: int = 85) -> tuple[bytes, str]:
     """
     Resize image so its longest side is at most *max_side* pixels, convert to
-    RGB, and re-encode as JPEG.
+    RGB, automatically correct EXIF orientation, and re-encode as JPEG.
 
     Returns (jpeg_bytes, "image/jpeg").
     """
+    from PIL import ImageOps
+
     img = Image.open(io.BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img)
     img = img.convert("RGB")
 
     w, h = img.size

@@ -128,10 +128,24 @@ def generate_with_fallback(
                     contents=contents,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
-                        max_output_tokens=2048,
+                        max_output_tokens=8192,
                     ),
                 )
-                return response.text or "", model
+                if response.text:
+                    return response.text, model
+
+                # Fallback: if model produced parts marked as thoughts, extract text from parts
+                text_parts = []
+                if response.candidates:
+                    for cand in response.candidates:
+                        if cand.content and cand.content.parts:
+                            for part in cand.content.parts:
+                                if hasattr(part, "text") and part.text:
+                                    text_parts.append(part.text)
+                if text_parts:
+                    return "\n".join(text_parts), model
+
+                return "", model
 
             except Exception as exc:
                 last_error = exc
@@ -296,9 +310,26 @@ if uploaded:
         st.image(img, caption=f"{uploaded.name} (Page {selected_page} of {total_pages})", use_container_width=True)
         active_image_bytes = preview_bytes
     else:
+        if "img_rotation" not in st.session_state:
+            st.session_state["img_rotation"] = 0
+
+        col_title, col_rot = st.columns([3, 1])
+        with col_rot:
+            if st.button("🔄 Rotate 90°", help="Rotate image clockwise if notes appear sideways"):
+                st.session_state["img_rotation"] = (st.session_state["img_rotation"] + 90) % 360
+                st.rerun()
+
+        rot_deg = st.session_state.get("img_rotation", 0)
         img = Image.open(io.BytesIO(raw_bytes))
-        st.image(img, caption=uploaded.name, use_container_width=True)
-        active_image_bytes = raw_bytes
+        if rot_deg != 0:
+            img = img.rotate(-rot_deg, expand=True)
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=90)
+            active_image_bytes = buf.getvalue()
+        else:
+            active_image_bytes = raw_bytes
+
+        st.image(img, caption=uploaded.name + (f" (Rotated {rot_deg}°)" if rot_deg else ""), use_container_width=True)
 
     st.divider()
 
