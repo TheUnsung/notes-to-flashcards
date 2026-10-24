@@ -27,11 +27,6 @@ Supports both **local execution** (via `.env`) and **Streamlit Community Cloud**
 |:---:|:---:|
 | ![Quiz Mode](screenshots/quiz_mode.png) | ![Counter Question](screenshots/counter_question.png) |
 
-> _To add or update your screenshots, save your images in the `screenshots/` directory with these filenames:_
-> - `screenshots/formula_extractor.png`
-> - `screenshots/flashcards.png`
-> - `screenshots/quiz_mode.png`
-> - `screenshots/counter_question.png`
 
 ---
 
