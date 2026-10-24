@@ -656,6 +656,39 @@ class TestParseFormulas:
         with pytest.raises(ValueError, match="Expected a JSON list of formulas"):
             parse_formulas(json.dumps({"error": "not a list"}))
 
+    def test_handles_single_object_with_preamble(self):
+        raw = """Here is the extracted formula:
+```json
+{
+  "name": "Wavelength Formula",
+  "latex_equation": "\\lambda = \\frac{\\beta d}{D}",
+  "description": "Calculates wavelength."
+}
+```"""
+        res = parse_formulas(raw)
+        assert len(res) == 1
+        assert res[0]["name"] == "Wavelength Formula"
+        assert "\\lambda" in res[0]["latex_equation"]
+
+    def test_handles_trailing_commas(self):
+        raw = """[
+          {
+            "name": "Ohm's Law",
+            "latex_equation": "V = IR",
+          },
+        ]"""
+        res = parse_formulas(raw)
+        assert len(res) == 1
+        assert res[0]["name"] == "Ohm's Law"
+
+    def test_handles_markdown_formula_fallback(self):
+        raw = """Based on the notes, here is the formula:
+**Wavelength**: $$\lambda = \frac{\beta d}{D}$$
+Valid for Fresnel biprism."""
+        res = parse_formulas(raw)
+        assert len(res) >= 1
+        assert "\\lambda" in res[0]["latex_equation"]
+
 
 # =========================================================================== #
 # clean_dot_code                                                              #

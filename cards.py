@@ -34,7 +34,9 @@ _LATEX_CMD_ESCAPE_RE = re.compile(r'\\(?=[bfnrt][a-zA-Z])')
 
 
 def _clean_json_escapes(s: str) -> str:
-    r"""Escape unescaped backslashes (such as LaTeX \pm, \frac, \beta, etc.) in JSON strings."""
+    r"""Escape unescaped backslashes and strip trailing commas in JSON strings."""
+    # Strip trailing commas before closing ] or }
+    s = re.sub(r',\s*([\]}])', r'\1', s)
     s = _LATEX_CMD_ESCAPE_RE.sub(r'\\\\', s)
     return _INVALID_ESCAPE_RE.sub(r'\\\\', s)
 
@@ -176,28 +178,30 @@ def build_formula_synthesizer_prompt(language: str) -> str:
         f"You are an expert STEM Knowledge & Formula Synthesizer. Analyze the provided STEM content "
         f"(notes, textbook page, text, or research paper) and extract all governing mathematical equations, "
         f"physical laws, chemical formulas, or scientific relationships.\n\n"
-        f"Formatting rules:\n"
-        f"1. Format every equation strictly in valid LaTeX (do not include enclosing dollar signs in the json value).\n"
-        f"2. For each formula, provide:\n"
-        f"   - 'name': Name of the law, equation, theorem, or formula.\n"
-        f"   - 'latex_equation': Clean LaTeX representation (e.g. 'F = m \\cdot a' or '\\lambda = \\frac{{D \\beta}}{{d}}').\n"
-        f"   - 'description': Brief 1-2 sentence explanation of what the formula computes or represents.\n"
-        f"   - 'variables': List of objects with 'symbol', 'definition', and 'unit' (standard SI unit or dimensionless).\n"
-        f"   - 'assumptions': Crucial conditions, assumptions, or limits of validity (e.g., 'Valid only for constant acceleration', 'Non-relativistic speeds v << c', 'Ideal gas behavior').\n"
-        f"3. {lang_note}\n"
-        f"4. Return ONLY a JSON array of formula objects. No conversational text, no markdown fences.\n\n"
+        f"CRITICAL REQUIREMENTS:\n"
+        f"1. Return ONLY a valid JSON array starting with '[' and ending with ']'.\n"
+        f"2. Do NOT write any greeting, conversational text, or explanation before or after the JSON.\n"
+        f"3. Format every equation strictly in clean valid LaTeX (do not include dollar signs in the json value).\n"
+        f"4. For each formula object in the array, provide:\n"
+        f"   - 'name': Specific name of the formula, equation, or law.\n"
+        f"   - 'latex_equation': Clean LaTeX formula (e.g. '\\\\lambda = \\\\frac{{\\\\beta d}}{{D}}' or 'F = m \\cdot a').\n"
+        f"   - 'description': Clear explanation of what the formula computes or represents.\n"
+        f"   - 'variables': Array of variable objects, each with 'symbol', 'definition', and 'unit' (SI unit or dimensionless).\n"
+        f"   - 'assumptions': Key physical conditions, limits of validity, or approximations.\n"
+        f"5. {lang_note}\n\n"
         f"Example JSON structure:\n"
         f'[\n'
         f'  {{\n'
-        f'    "name": "Newton\'s Second Law",\n'
-        f'    "latex_equation": "F = m \\cdot a",\n'
-        f'    "description": "Relates the net force acting on an object to its mass and resulting acceleration.",\n'
+        f'    "name": "Wavelength Formula (Bi-prism)",\n'
+        f'    "latex_equation": "\\\\lambda = \\\\frac{{\\\\beta d}}{{D}}",\n'
+        f'    "description": "Calculates the wavelength of monochromatic light using interference fringe width.",\n'
         f'    "variables": [\n'
-        f'      {{"symbol": "F", "definition": "Net Force", "unit": "N (kg*m/s^2)"}},\n'
-        f'      {{"symbol": "m", "definition": "Mass of the object", "unit": "kg"}},\n'
-        f'      {{"symbol": "a", "definition": "Acceleration", "unit": "m/s^2"}}\n'
+        f'      {{"symbol": "\\\\lambda", "definition": "Wavelength of light source", "unit": "m"}},\n'
+        f'      {{"symbol": "\\\\beta", "definition": "Fringe width", "unit": "m"}},\n'
+        f'      {{"symbol": "D", "definition": "Distance between slit and eyepiece", "unit": "m"}},\n'
+        f'      {{"symbol": "d", "definition": "Distance between virtual coherent sources", "unit": "m"}}\n'
         f'    ],\n'
-        f'    "assumptions": "Valid for constant mass in an inertial reference frame at non-relativistic velocities."\n'
+        f'    "assumptions": "Valid for monochromatic light source and small angles of incidence in interference setup."\n'
         f'  }}\n'
         f']'
     )
@@ -302,15 +306,45 @@ def clean_dot_code(raw: str) -> str:
     return text
 
 
+def _parse_formulas_from_markdown(text: str) -> list[dict[str, Any]]:
+    """Fallback extractor when model returns Markdown / LaTeX instead of pure JSON."""
+    formulas: list[dict[str, Any]] = []
+    eq_patterns = re.findall(
+        r'(?:(?:\*\*|#+)?\s*([^\n:*]+)(?:\*\*|:)?\s*[:\n])?\s*(?:\$\$([\s\S]*?)\$\$|\$([^\$\n]+)\$|(?:formula|equation)\s*[:=]\s*([^\n]+))',
+        text,
+        re.IGNORECASE,
+    )
+    for title, b_eq, i_eq, l_eq in eq_patterns:
+        eq = (b_eq or i_eq or l_eq).strip().strip('$')
+        if not eq or len(eq) < 2:
+            continue
+        clean_name = title.strip().strip('*#: ') if title else "Governing Equation"
+        if len(clean_name) > 50 or "=" in clean_name or "\\" in clean_name:
+            clean_name = "Governing Equation"
+        formulas.append({
+            "name": clean_name or "Governing Equation",
+            "latex_equation": eq,
+            "description": f"Extracted scientific equation: {clean_name}",
+            "variables": [],
+            "assumptions": "Standard experimental and theoretical conditions.",
+        })
+    return formulas
+
+
 def parse_formulas(raw: str) -> list[dict[str, Any]]:
-    """Parse JSON array of synthesized formulas with variable definitions and assumptions."""
+    """
+    Parse JSON array of synthesized formulas with variable definitions and assumptions.
+    Robust to fenced code blocks, single objects, preamble text, and unescaped LaTeX math.
+    """
     if not raw or not raw.strip():
         raise ValueError("Model returned an empty formula synthesis response.")
 
     text = raw.strip()
-    m = _FENCE_RE.match(text)
-    if m:
-        text = m.group(1).strip()
+
+    # 1. Search for fenced code blocks anywhere in text
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if fence_match and fence_match.group(1).strip():
+        text = fence_match.group(1).strip()
     elif text.startswith("```"):
         lines = text.splitlines()
         lines = lines[1:] if lines[0].startswith("```") else lines
@@ -318,20 +352,64 @@ def parse_formulas(raw: str) -> list[dict[str, Any]]:
         text = "\n".join(lines).strip()
 
     data: Any = None
-    try:
-        data = json.loads(text, strict=False)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]")
-        candidate = text[start : end + 1] if (start != -1 and end != -1 and end > start) else text
+
+    def _try_decode(candidate_str: str) -> Any:
         try:
-            data = json.loads(candidate, strict=False)
+            return json.loads(candidate_str, strict=False)
         except json.JSONDecodeError:
+            fixed_str = _clean_json_escapes(candidate_str)
+            return json.loads(fixed_str, strict=False)
+
+    # 2. Try direct decode
+    try:
+        data = _try_decode(text)
+    except Exception:
+        # 3. Try finding array brackets [ ... ]
+        start_bracket = text.find("[")
+        end_bracket = text.rfind("]")
+        if start_bracket != -1 and end_bracket > start_bracket:
+            bracket_cand = text[start_bracket : end_bracket + 1]
             try:
-                fixed = _clean_json_escapes(candidate)
-                data = json.loads(fixed, strict=False)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Could not parse synthesized formulas as JSON: {exc}") from exc
+                data = _try_decode(bracket_cand)
+            except Exception:
+                pass
+
+        # 4. If array not found, try finding single object braces { ... }
+        if data is None:
+            start_brace = text.find("{")
+            end_brace = text.rfind("}")
+            if start_brace != -1 and end_brace > start_brace:
+                brace_cand = text[start_brace : end_brace + 1]
+                try:
+                    data = _try_decode(brace_cand)
+                except Exception:
+                    pass
+
+    # 5. If JSON completely failed, fallback to markdown parser
+    if data is None:
+        md_formulas = _parse_formulas_from_markdown(raw)
+        if md_formulas:
+            return md_formulas
+        raise ValueError("Could not parse synthesized formulas as JSON. Please try again.")
+
+    # 6. Normalize data structure
+    if isinstance(data, dict):
+        if "formulas" in data and isinstance(data["formulas"], list):
+            data = data["formulas"]
+        elif "equations" in data and isinstance(data["equations"], list):
+            data = data["equations"]
+        else:
+            found_list = False
+            for v in data.values():
+                if isinstance(v, list) and v and isinstance(v[0], dict):
+                    data = v
+                    found_list = True
+                    break
+            if not found_list:
+                if any(k in data for k in ("name", "latex_equation", "equation", "formula")):
+                    data = [data]
+                else:
+                    raise ValueError(f"Expected a JSON list of formulas, got dict")
 
     if not isinstance(data, list):
         raise ValueError(f"Expected a JSON list of formulas, got {type(data).__name__}")
@@ -341,7 +419,7 @@ def parse_formulas(raw: str) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", f"Formula {i + 1}")).strip()
-        eq = str(item.get("latex_equation", item.get("equation", ""))).strip()
+        eq = str(item.get("latex_equation", item.get("equation", item.get("formula", "")))).strip()
         desc = str(item.get("description", "")).strip()
         assumptions = str(item.get("assumptions", item.get("conditions", "Standard conditions"))).strip()
         vars_raw = item.get("variables", [])
@@ -361,6 +439,13 @@ def parse_formulas(raw: str) -> list[dict[str, Any]]:
             "variables": variables,
             "assumptions": assumptions,
         })
+
+    if not validated:
+        md_formulas = _parse_formulas_from_markdown(raw)
+        if md_formulas:
+            return md_formulas
+        raise ValueError("No valid formulas found in the model response.")
+
     return validated
 
 
@@ -373,28 +458,22 @@ def parse_cards(raw: str) -> list[dict[str, str]]:
     whitespace before attempting json.loads.
 
     Returns a list like [{"front": "...", "back": "..."}, ...].
-
-    Raises:
-        ValueError – with a human-readable message on any validation failure.
     """
     if not raw or not raw.strip():
         raise ValueError("The model returned an empty response.")
 
     text = raw.strip()
 
-    # Strip markdown code fences (handles ```json\n...\n``` and ```\n...\n```)
-    m = _FENCE_RE.match(text)
-    if m:
-        text = m.group(1).strip()
+    # Search for fenced code blocks anywhere in text
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if fence_match and fence_match.group(1).strip():
+        text = fence_match.group(1).strip()
     elif text.startswith("```"):
-        # Fallback line-by-line strip for malformed fences
         lines = text.splitlines()
         lines = lines[1:] if lines[0].startswith("```") else lines
         lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
         text = "\n".join(lines).strip()
 
-    # Multi-stage parsing: handles raw JSON, bracketed JSON with conversational wrapper,
-    # and unescaped math/LaTeX backslashes.
     data: Any = None
     try:
         data = json.loads(text, strict=False)
