@@ -21,8 +21,15 @@ from PIL import Image
 # Load local environment variables from .env file
 load_dotenv()
 
+# --------------------------------------------------------------------------- #
+# Supported Models – Gemma 4 only. First entry is preferred default.          #
+# --------------------------------------------------------------------------- #
+MODELS = [
+    "gemma-4-26b-a4b-it",  # Faster default: 4B active parameters (MoE)
+    "gemma-4-31b-it",      # High-capacity fallback: 31B dense parameters
+]
+
 from cards import (
-    MODELS,
     build_concept_graph_prompt,
     build_counter_question_prompt,
     build_elaboration_prompt,
