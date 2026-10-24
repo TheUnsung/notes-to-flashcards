@@ -159,8 +159,7 @@ def generate_with_fallback(
                     wait = _RETRY_DELAYS[attempt]
                     try:
                         st.toast(
-                            f"⏳ {model} busy – retrying in {wait}s (attempt {attempt + 1}/{_MODEL_RETRIES})…",
-                            icon="🔄",
+                            f"{model} busy – retrying in {wait}s (attempt {attempt + 1}/{_MODEL_RETRIES})…",
                         )
                     except Exception:
                         pass
@@ -170,8 +169,7 @@ def generate_with_fallback(
                 if attempt >= _MODEL_RETRIES:
                     try:
                         st.toast(
-                            f"⚠️ {model} exceeded retries. Switching to fallback model…",
-                            icon="🔀",
+                            f"{model} exceeded retries. Switching to fallback model…",
                         )
                     except Exception:
                         pass
@@ -181,55 +179,64 @@ def generate_with_fallback(
 
 
 # --------------------------------------------------------------------------- #
-# Page Configuration & Modern Styling                                          #
+# Page Configuration & Pitch-Black Theme                                      #
 # --------------------------------------------------------------------------- #
 
 st.set_page_config(
-    page_title="STEM Formula Extractor & Flashcards",
-    page_icon="⚛️",
+    page_title="SpectraLearn",
     layout="wide",
 )
 
 st.markdown(
     """
     <style>
-    /* Bigger, rounded tabs with smooth hover animations */
+    /* Pitch Black Background */
+    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #000000 !important;
+    }
+    [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+        background-color: #050505 !important;
+    }
+
+    /* Modern Rounded Tabs with Hover Animations */
     .stTabs [data-baseweb="tab-list"] {
         gap: 12px;
         padding-top: 8px;
         padding-bottom: 12px;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid #1a1a1a;
     }
     .stTabs [data-baseweb="tab"] {
-        font-size: 1.1rem !important;
+        font-size: 1rem !important;
         font-weight: 600 !important;
-        padding: 12px 26px !important;
-        border-radius: 12px 12px 0 0 !important;
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 10px 24px !important;
+        border-radius: 10px 10px 0 0 !important;
+        background: #080808 !important;
+        border: 1px solid #1a1a1a !important;
         border-bottom: none !important;
-        color: #e2e8f0 !important;
+        color: #a1a1aa !important;
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(255, 255, 255, 0.12) !important;
-        color: #38bdf8 !important;
-        transform: translateY(-3px) !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
-        border-color: rgba(56, 189, 248, 0.5) !important;
+        background: #141414 !important;
+        color: #3b82f6 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
     }
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(180deg, rgba(56, 189, 248, 0.2) 0%, rgba(56, 189, 248, 0.04) 100%) !important;
-        border-color: #38bdf8 !important;
-        color: #38bdf8 !important;
-        border-bottom: 2px solid #38bdf8 !important;
-        box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25) !important;
+        background: #0f172a !important;
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+        border-bottom: 2px solid #3b82f6 !important;
     }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #3b82f6 !important;
+    }
+
     /* Compact document preview image */
     .stImage img {
         border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid #222222 !important;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5) !important;
         max-height: 480px !important;
         object-fit: contain !important;
     }
@@ -243,12 +250,12 @@ st.markdown(
 # --------------------------------------------------------------------------- #
 
 with st.sidebar:
-    st.header("⚙️ Configuration")
+    st.header("Configuration")
 
-    st.subheader("🎯 Mode Selection")
+    st.subheader("Mode Selection")
     active_mode = st.radio(
         "Choose Mode",
-        options=["📐 Formula Extractor", "🃏 Flashcards"],
+        options=["Formula Extractor", "Flashcards"],
         index=0,
         help="Select whether to extract formula cards or generate study flashcards.",
     )
@@ -277,7 +284,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown(
-        "<small>Powered by <b>Gemma 4</b> via Google GenAI SDK</small>",
+        "<small style='color: #64748b;'>Powered by <b>Gemma 4</b> via Google GenAI SDK</small>",
         unsafe_allow_html=True,
     )
 
@@ -285,7 +292,7 @@ with st.sidebar:
 # Main Header                                                                  #
 # --------------------------------------------------------------------------- #
 
-st.title("⚛️ STEM Formula Extractor & Flashcards")
+st.title("SpectraLearn")
 st.caption(
     "Extract mathematical laws, SI variable units, and validity assumptions, "
     "or generate study flashcards with interactive quizzing and conceptual Q&A."
@@ -296,12 +303,12 @@ st.divider()
 # Input Section                                                                #
 # --------------------------------------------------------------------------- #
 
-st.subheader("📥 Input Notes")
+st.subheader("Input Notes")
 
 input_tab_upload, input_tab_text = st.tabs(
     [
-        "📁 Upload Notes / PDF",
-        "📝 Paste Text Notes",
+        "Upload Notes / PDF",
+        "Paste Text Notes",
     ]
 )
 
@@ -323,7 +330,7 @@ with input_tab_upload:
             try:
                 total_pages = get_pdf_page_count(raw_bytes)
             except ValueError as err:
-                st.error(f"❌ Invalid PDF: {err}")
+                st.error(f"Invalid PDF: {err}")
                 st.stop()
 
             selected_page = 1
@@ -343,12 +350,11 @@ with input_tab_upload:
                         raw_bytes, page_number=selected_page - 1, dpi_scale=1.5
                     )
                 except ValueError as err:
-                    st.error(f"❌ Could not render PDF page: {err}")
+                    st.error(f"Could not render PDF page: {err}")
                     st.stop()
             preview_bytes = st.session_state[pdf_cache_key]
             img = Image.open(io.BytesIO(preview_bytes))
-            
-            # Display image in a clean, constrained column so it doesn't span full-screen
+
             col_preview, _ = st.columns([1, 1])
             with col_preview:
                 st.image(
@@ -363,7 +369,7 @@ with input_tab_upload:
 
             col_rot_btn, _ = st.columns([1, 3])
             with col_rot_btn:
-                if st.button("🔄 Rotate 90°", help="Rotate image clockwise if notes appear sideways"):
+                if st.button("Rotate 90°", help="Rotate image clockwise if notes appear sideways"):
                     st.session_state["img_rotation"] = (st.session_state["img_rotation"] + 90) % 360
                     st.rerun()
 
@@ -377,7 +383,6 @@ with input_tab_upload:
             else:
                 active_image_bytes = raw_bytes
 
-            # Display image in a clean, constrained column so it doesn't span full-screen
             col_preview, _ = st.columns([1, 1])
             with col_preview:
                 st.image(
@@ -411,13 +416,13 @@ st.divider()
 # Action Button                                                                #
 # --------------------------------------------------------------------------- #
 
-btn_title = f"✨ Run {active_mode}"
+btn_title = f"Run {active_mode}"
 if st.button(btn_title, type="primary", use_container_width=True):
     if not _get_api_key():
         st.error(
-            "❌ **GEMINI_API_KEY is not configured.**\n\n"
-            "- If running locally: create a `.env` file with `GEMINI_API_KEY=your_key`.\n"
-            "- If running on Streamlit Cloud: set `GEMINI_API_KEY` in **App Settings → Secrets**."
+            "GEMINI_API_KEY is not configured.\n\n"
+            "- If running locally: create a .env file with GEMINI_API_KEY=your_key.\n"
+            "- If running on Streamlit Cloud: set GEMINI_API_KEY in App Settings → Secrets."
         )
         st.stop()
 
@@ -431,7 +436,7 @@ if st.button(btn_title, type="primary", use_container_width=True):
         contents_list.append(types.Part.from_text(text=text_prefix))
 
     if not contents_list:
-        st.error("❌ Please upload an image/PDF or paste notes before generating.")
+        st.error("Please upload an image/PDF or paste notes before generating.")
         st.stop()
 
     with st.spinner(f"Processing with {preferred_model}…"):
@@ -459,9 +464,9 @@ if st.button(btn_title, type="primary", use_container_width=True):
                 st.session_state["quiz_index"] = 0
                 st.session_state["quiz_score"] = 0
                 st.session_state["revealed"] = False
-            st.success("✅ Generation complete!")
+            st.success("Generation complete.")
         except Exception as exc:
-            st.error(f"❌ Generation failed: {exc}")
+            st.error(f"Generation failed: {exc}")
             st.stop()
 
 # --------------------------------------------------------------------------- #
@@ -476,11 +481,11 @@ has_cards = "cards" in st.session_state and st.session_state["cards"]
 if is_formula_mode:
     if has_formulas:
         st.divider()
-        tab_formulas, tab_counter = st.tabs(["📐 Formula Extractor", "💬 Counter Question"])
+        tab_formulas, tab_counter = st.tabs(["Formula Extractor", "Counter Question"])
 
         with tab_formulas:
             formulas = st.session_state["formulas"]
-            st.markdown(f"### 📐 Extracted Formulas ({len(formulas)})")
+            st.markdown(f"### Extracted Formulas ({len(formulas)})")
             st.caption("Governing equations, variable definitions with SI units, and validity conditions.")
 
             for i, f in enumerate(formulas, start=1):
@@ -489,7 +494,7 @@ if is_formula_mode:
                     with col_title:
                         st.markdown(f"#### {i}. {f.get('name', 'Formula')}")
                     with col_idx:
-                        st.caption(f"`Formula #{i}`")
+                        st.caption(f"Formula {i}")
 
                     raw_eq = f.get("latex_equation", "").strip()
                     if raw_eq:
@@ -514,10 +519,10 @@ if is_formula_mode:
 
                     assumptions = f.get("assumptions")
                     if assumptions:
-                        st.info(f"**⚠️ Validity Limits & Conditions:** {assumptions}")
+                        st.info(f"**Validity Limits & Conditions:** {assumptions}")
 
         with tab_counter:
-            st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
+            st.markdown("### Counter-Question & Conceptual Q&A")
             st.caption(
                 "Challenge or probe any extracted formula. Gemma 4 provides rigorous STEM explanations."
             )
@@ -570,7 +575,7 @@ if is_formula_mode:
                 height=100,
             )
 
-            if st.button("🚀 Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
+            if st.button("Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
                 if not user_query.strip():
                     st.warning("Please type a question before asking.")
                 else:
@@ -597,7 +602,7 @@ if is_formula_mode:
                             })
                             st.rerun()
                         except RuntimeError as err:
-                            st.error(f"❌ Error getting response from Gemma 4: {err}")
+                            st.error(f"Error getting response from Gemma 4: {err}")
 
 # When in Flashcards mode, only show Browse Flashcards, Quiz Mode & Counter-Question
 else:
@@ -605,15 +610,15 @@ else:
         st.divider()
         tab_cards, tab_quiz, tab_counter = st.tabs(
             [
-                "📖 Browse Flashcards",
-                "🎯 Quiz Mode",
-                "💬 Counter Question",
+                "Browse Flashcards",
+                "Quiz Mode",
+                "Counter Question",
             ]
         )
 
         with tab_cards:
             cards = st.session_state["cards"]
-            st.markdown(f"### 🃏 Study Flashcards ({len(cards)})")
+            st.markdown(f"### Study Flashcards ({len(cards)})")
             st.caption("Review flashcards with LaTeX equations or export to Anki.")
 
             for i, card in enumerate(cards, start=1):
@@ -624,7 +629,7 @@ else:
                     if elab_key in st.session_state:
                         st.info(st.session_state[elab_key])
                     else:
-                        if st.button("💡 Elaborate explanation", key=f"btn_elab_{i}"):
+                        if st.button("Elaborate Explanation", key=f"btn_elab_{i}"):
                             with st.spinner("Asking Gemma 4 to elaborate…"):
                                 try:
                                     elab_prompt = build_elaboration_prompt(
@@ -644,7 +649,7 @@ else:
             st.divider()
             csv_text = cards_to_csv(cards)
             st.download_button(
-                label="⬇️ Download CSV for Anki",
+                label="Download CSV for Anki",
                 data=csv_text.encode("utf-8"),
                 file_name="stem_flashcards.csv",
                 mime="text/csv",
@@ -658,19 +663,18 @@ else:
             revealed: bool = st.session_state.get("revealed", False)
 
             if idx >= len(cards):
-                st.balloons()
-                st.subheader("🎉 Quiz Complete!")
+                st.subheader("Quiz Complete")
                 st.metric("Score", f"{score} / {len(cards)}")
                 pct = int(score / len(cards) * 100)
                 st.progress(pct / 100)
                 if pct == 100:
-                    st.success("Perfect mastery! Outstanding! 🏆")
+                    st.success("Perfect mastery. Outstanding work.")
                 elif pct >= 70:
-                    st.info("Solid understanding! Review missed cards to master the topic.")
+                    st.info("Solid understanding. Review missed cards to master the topic.")
                 else:
-                    st.warning("Keep practicing – reinforcement builds intuition! 💪")
+                    st.warning("Keep practicing – reinforcement builds intuition.")
 
-                if st.button("🔄 Restart Quiz", use_container_width=True):
+                if st.button("Restart Quiz", use_container_width=True):
                     st.session_state["quiz_index"] = 0
                     st.session_state["quiz_score"] = 0
                     st.session_state["revealed"] = False
@@ -680,11 +684,11 @@ else:
                 st.markdown(f"**Card {idx + 1} of {len(cards)}**")
                 st.progress(idx / len(cards))
                 st.markdown("---")
-                st.subheader("❓ " + card["front"])
+                st.subheader(card["front"])
                 st.markdown("---")
 
                 if not revealed:
-                    if st.button("👁 Reveal Answer", use_container_width=True):
+                    if st.button("Reveal Answer", use_container_width=True):
                         st.session_state["revealed"] = True
                         st.rerun()
                 else:
@@ -693,10 +697,10 @@ else:
                     quiz_elab_key = f"elab_quiz_{idx}_{hash(card['front']) % 10000}"
                     if quiz_elab_key in st.session_state:
                         st.markdown("---")
-                        st.markdown("#### 💡 Deep Dive Explanation")
+                        st.markdown("#### Deep Dive Explanation")
                         st.markdown(st.session_state[quiz_elab_key])
                     else:
-                        if st.button("💡 Elaborate explanation", key=f"btn_quiz_elab_{idx}"):
+                        if st.button("Elaborate Explanation", key=f"btn_quiz_elab_{idx}"):
                             with st.spinner("Asking Gemma 4 to elaborate…"):
                                 try:
                                     elab_prompt = build_elaboration_prompt(
@@ -715,13 +719,13 @@ else:
 
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ I knew it", use_container_width=True):
+                        if st.button("I Knew It", use_container_width=True):
                             st.session_state["quiz_score"] += 1
                             st.session_state["quiz_index"] += 1
                             st.session_state["revealed"] = False
                             st.rerun()
                     with col2:
-                        if st.button("🔁 Review again", use_container_width=True):
+                        if st.button("Review Again", use_container_width=True):
                             cards.append(cards[idx])
                             st.session_state["cards"] = cards
                             st.session_state["quiz_index"] += 1
@@ -729,7 +733,7 @@ else:
                             st.rerun()
 
         with tab_counter:
-            st.markdown("### 💬 Counter-Question & Conceptual Socratic Q&A")
+            st.markdown("### Counter-Question & Conceptual Q&A")
             st.caption(
                 "Challenge or probe any flashcard concept. Gemma 4 provides rigorous STEM explanations."
             )
@@ -776,7 +780,7 @@ else:
                 height=100,
             )
 
-            if st.button("🚀 Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
+            if st.button("Ask Gemma 4", type="primary", use_container_width=True, key=f"btn_ask_{history_key}"):
                 if not user_query.strip():
                     st.warning("Please type a question before asking.")
                 else:
@@ -803,7 +807,7 @@ else:
                             })
                             st.rerun()
                         except RuntimeError as err:
-                            st.error(f"❌ Error getting response from Gemma 4: {err}")
+                            st.error(f"Error getting response from Gemma 4: {err}")
 
 # --------------------------------------------------------------------------- #
 # Footer                                                                       #
